@@ -1,0 +1,36 @@
+plugin/plugin.json
+  d7380fe541df2300 2,5-6,15
+tests/js/helper-client.test.js
+  d7380fe541df2300 7-10,48-78
+scripts/helper-Info.plist
+  d7380fe541df2300 11
+plugin/lib/helper-client.js
+  d7380fe541df2300 5,7,11-13,17-18,28,125-197,200
+tests/js/manifest.test.js
+  d7380fe541df2300 29-38
+docs/architecture.md
+  d7380fe541df2300 33-35,47,94,110,263,275
+package.json
+  d7380fe541df2300 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "f44df18213c24953f9baffe3c706b332eb797ab9",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 150,
+      "total_deletions": 25,
+      "accepted_lines": 166,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/040ef8a1f40b8cb4f76db16e0f49c6d7098a7d6c56bb093551eb6ee2b5825795"
+    }
+  }
+}
