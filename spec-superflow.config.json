@@ -1,8 +1,0 @@
-{
-  "models": {
-    "mechanical": "gpt-5.6-terra",
-    "standard": "gpt-5.6-terra",
-    "strong": "gpt-5.6-sol",
-    "review": "gpt-5.6-sol"
-  }
-}

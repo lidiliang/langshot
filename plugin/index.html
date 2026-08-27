@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: file:; style-src 'self'; script-src 'self'" />
+    <title>langShot</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><img src="logo.svg" alt="" /><span>langShot</span></div>
+        <button class="icon-button" id="settingsButton" aria-label="设置">⌘</button>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">原始像素 · 本地处理</div>
+        <h1>一滚，就是一张完整长图。</h1>
+        <p>选择区域后手动滚动，或让 langShot 自动滚动并智能拼接。</p>
+      </section>
+
+      <section class="mode-grid" aria-label="截图模式">
+        <button class="mode-card selected" data-mode="manual">
+          <span class="mode-icon">↕</span>
+          <strong>手动滚动</strong>
+          <small>滚动时可继续调整选区</small>
+        </button>
+        <button class="mode-card" data-mode="automatic">
+          <span class="mode-icon">◎</span>
+          <strong>自动滚动</strong>
+          <small>指定锚点后自动完成</small>
+        </button>
+      </section>
+
+      <div class="direction-row" aria-label="滚动方向">
+        <span>滚动方向</span>
+        <button class="direction selected" data-direction="down">向下</button>
+        <button class="direction" data-direction="up">向上</button>
+      </div>
+
+      <section class="permission-card" id="permissionCard" hidden>
+        <div><strong>需要系统权限</strong><p id="permissionMessage"></p></div>
+        <button class="secondary" id="openSettingsButton">前往设置</button>
+      </section>
+
+      <footer class="actions">
+        <div class="privacy-note"><span></span>截图不会离开这台 Mac</div>
+        <button class="primary" id="startButton">选择截图区域</button>
+      </footer>
+      <section class="result-panel" id="resultPanel" hidden>
+        <img id="resultImage" alt="长截图预览" />
+        <div class="result-meta"><strong>长截图已完成</strong><small id="resultPath"></small></div>
+        <button class="secondary" id="revealButton">在访达中显示</button>
+        <button class="primary compact" id="copyButton">复制图片</button>
+      </section>
+      <div class="toast" id="toast" role="status" hidden></div>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

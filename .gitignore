@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+dist/
+build/
+native/.build/
+*.xcresult
+*.log
+.langshot-sessions/
+

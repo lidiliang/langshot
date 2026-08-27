@@ -1,0 +1,17 @@
+{
+  "name": "langshot-utools-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "langShot — a native-pixel scrolling screenshot plugin for uTools on macOS",
+  "scripts": {
+    "test": "node --test tests/js/*.test.js",
+    "test:native": "swift test --package-path native",
+    "check": "npm test && npm run test:native",
+    "build:native": "bash scripts/build-native.sh",
+    "package:dev": "bash scripts/package-plugin.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
