@@ -1,0 +1,32 @@
+changes/langshot/.spec-superflow.yaml
+  d7380fe541df2300 7,10,15-16,39-40
+changes/langshot/.superpowers/sdd/execution-plan.json
+  d7380fe541df2300 3-4,86,89,214,217-219,226
+changes/langshot/.superpowers/sdd/execution-recommendation.json
+  d7380fe541df2300 104,107-109
+changes/langshot/tasks.md
+  d7380fe541df2300 15,22,29,36,43,50,57,64,71,80,87,94,101,108,115,122,129,136
+spec-superflow.config.json
+  d7380fe541df2300 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "21e5cb190ef12889e61e66a9c9aba15171852832",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 38,
+      "accepted_lines": 45,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/c846e1c69b79f227a9f0c07b786bdc4b0cb1ff26c260f1ebb70d77f743cb4272"
+    }
+  }
+}
