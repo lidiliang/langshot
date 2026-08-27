@@ -1,0 +1,24 @@
+README.md
+  d7380fe541df2300 15,17-28,31,36-52,56,58-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "04c92cb359f49e4ce244e65e5d544dfdb46c70a6",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 56,
+      "total_deletions": 6,
+      "accepted_lines": 56,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/1e68f6dfcc6c05467cf6ee0b1587b56b05270f8de77c0b4f2bb5993a2a9d18cc"
+    }
+  }
+}
