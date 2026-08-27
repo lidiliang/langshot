@@ -1,7 +1,7 @@
 {
   "mode": "sdd",
-  "source": "user-confirmed",
-  "rationale": "用户明确选择 SDD 执行模式",
+  "source": "user-confirmed-revision",
+  "rationale": "仅修正任务标题为提取器兼容格式，保持用户选择的 SDD、任务内容和七个 wave 不变",
   "waves": [
     {
       "id": "foundation",
@@ -83,10 +83,10 @@
       ]
     }
   ],
-  "artifacts_hash": "sha256:1031f6e63c1ba691b7d6e70cc8704a1127a7d8dd4e12570ae32a5c6d03fb67e4",
+  "artifacts_hash": "sha256:5a29907ebea6d6ba5e824a520bcbb17754e0e2a98a082b78e8c74b4442519da7",
   "contract_hash": "sha256:8eac1b07171bc20c9f539cff5a5face7ae596bdded4a4cc716f45974044a7e67",
   "workflow": "full",
-  "revision": 1,
+  "revision": 2,
   "recommendation": {
     "available_modes": [
       "inline",
@@ -211,17 +211,17 @@
         ]
       }
     ],
-    "artifacts_hash": "sha256:1031f6e63c1ba691b7d6e70cc8704a1127a7d8dd4e12570ae32a5c6d03fb67e4",
+    "artifacts_hash": "sha256:5a29907ebea6d6ba5e824a520bcbb17754e0e2a98a082b78e8c74b4442519da7",
     "contract_hash": "sha256:8eac1b07171bc20c9f539cff5a5face7ae596bdded4a4cc716f45974044a7e67",
     "workflow": "full",
-    "execution_plan_revision_at_recommendation": null,
-    "created_at": "2026-08-27T05:54:23.259Z",
-    "hash": "sha256:7d5d940a526d5e8032b657bf9313abc7f8e490cd751eb50d1a558c724495ac76"
+    "execution_plan_revision_at_recommendation": 1,
+    "created_at": "2026-08-27T06:00:27.714Z",
+    "hash": "sha256:8c9f70f75570a59e5fb8a03b74f6cbf1d78a513aee1c4310f44496db77a77ae2"
   },
   "selection": {
     "confirmed": true,
     "followed_recommendation": true,
     "acknowledged_non_recommendation": false
   },
-  "hash": "sha256:f5b0ed629a105abcfa688ffb2de643031563a6990ba26947b9c5e5fe1571d3da"
+  "hash": "sha256:17332407e26dbff127e6b827f8cf706d24b30a6accf8cfc0c8fd4a9ba9ae11d0"
 }

@@ -4,16 +4,16 @@
 # === Core state ===
 state: executing
 workflow: full
-revision: 1
+revision: 2
 
 # === Hashes (fast staleness detection) ===
-artifacts_hash: sha256:1031f6e63c1ba691b7d6e70cc8704a1127a7d8dd4e12570ae32a5c6d03fb67e4
+artifacts_hash: sha256:5a29907ebea6d6ba5e824a520bcbb17754e0e2a98a082b78e8c74b4442519da7
 contract_hash: sha256:8eac1b07171bc20c9f539cff5a5face7ae596bdded4a4cc716f45974044a7e67
 
 # === Execution progress ===
 execution_mode: sdd
-execution_plan_hash: sha256:f5b0ed629a105abcfa688ffb2de643031563a6990ba26947b9c5e5fe1571d3da
-execution_plan_revision: 1
+execution_plan_hash: sha256:17332407e26dbff127e6b827f8cf706d24b30a6accf8cfc0c8fd4a9ba9ae11d0
+execution_plan_revision: 2
 batches_completed: 0
 test_result: null
 spec_merged: false
@@ -36,8 +36,8 @@ dp_2_result: approved: 用户批准需求澄清基线、proposal、五组规格�
 dp_2_timestamp: 2026-08-27T05:51:40Z
 dp_3_result: approved: 用户批准包含33项需求映射、7个串行wave、TDD义务、review gates与回退规则的执行契约
 dp_3_timestamp: 2026-08-27T05:54:22Z
-dp_4_result: sdd: plan revision 1; user-confirmed; 用户明确选择 SDD 执行模式
-dp_4_timestamp: 2026-08-27T05:56:18.844Z
+dp_4_result: sdd: plan revision 2; user-confirmed-revision; 仅修正任务标题为提取器兼容格式，保持用户选择的 SDD、任务内容和七个 wave 不变
+dp_4_timestamp: 2026-08-27T06:00:27.760Z
 dp_5_result: null
 dp_5_timestamp: null
 dp_5_decisions: null
