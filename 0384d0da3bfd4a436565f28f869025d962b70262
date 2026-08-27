@@ -1,0 +1,30 @@
+scripts/build-native.sh
+  d7380fe541df2300 8-9,11-14,17,20-21
+README.md
+  d7380fe541df2300 1-31
+.gitignore
+  d7380fe541df2300 6-7
+native/Sources/LangShotPlatform/CaptureSessionEngine.swift
+  d7380fe541df2300 179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "0384d0da3bfd4a436565f28f869025d962b70262",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 7,
+      "accepted_lines": 43,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/30d427a726eb4c38240ce7f934de5912492c98024fe9b3207315bd463fe6d00a"
+    }
+  }
+}
