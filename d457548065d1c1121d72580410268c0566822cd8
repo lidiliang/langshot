@@ -1,0 +1,90 @@
+native/Sources/LangShotCore/Session.swift
+  d7380fe541df2300 1-64
+plugin/plugin.json
+  d7380fe541df2300 1-19
+native/Sources/LangShotCore/OverlapMatcher.swift
+  d7380fe541df2300 1-99
+plugin/lib/protocol.js
+  d7380fe541df2300 1-51
+plugin/app.js
+  d7380fe541df2300 1-93
+package.json
+  d7380fe541df2300 2-14,17
+native/Sources/LangShotPlatform/CaptureSessionEngine.swift
+  d7380fe541df2300 1-196
+native/Sources/LangShotCore/SessionStore.swift
+  d7380fe541df2300 1-92
+native/Tests/LangShotCoreTests/GeometryTests.swift
+  d7380fe541df2300 1-14
+plugin/logo.svg
+  d7380fe541df2300 1-13
+plugin/lib/helper-client.js
+  d7380fe541df2300 1-113
+tests/js/protocol.test.js
+  d7380fe541df2300 1-28
+native/Tests/LangShotCoreTests/ProtocolTests.swift
+  d7380fe541df2300 1-18
+tests/js/helper-client.test.js
+  d7380fe541df2300 1-36
+native/Tests/LangShotCoreTests/SessionTests.swift
+  d7380fe541df2300 1-23
+native/Sources/LangShotPlatform/ScreenCapture.swift
+  d7380fe541df2300 1-18
+native/Sources/LangShotPlatform/Displays.swift
+  d7380fe541df2300 1-31
+native/Sources/LangShotCore/Geometry.swift
+  d7380fe541df2300 1-73
+native/Tests/LangShotCoreTests/OverlapMatcherTests.swift
+  d7380fe541df2300 1-23
+.gitignore
+  d7380fe541df2300 1-9
+scripts/build-native.sh
+  d7380fe541df2300 1-17
+plugin/index.html
+  d7380fe541df2300 1-61
+native/Sources/LangShotPlatform/Permissions.swift
+  d7380fe541df2300 1-44
+plugin/styles.css
+  d7380fe541df2300 1-65
+plugin/preload.js
+  d7380fe541df2300 1-47
+native/Sources/LangShotCore/Protocol.swift
+  d7380fe541df2300 1-109
+native/Tests/LangShotCoreTests/SessionStoreTests.swift
+  d7380fe541df2300 1-24
+scripts/helper-Info.plist
+  d7380fe541df2300 1-19
+scripts/package-plugin.sh
+  d7380fe541df2300 1-19
+native/Package.swift
+  d7380fe541df2300 1-19
+native/Sources/LangShotHelper/main.swift
+  d7380fe541df2300 1-199
+native/Sources/LangShotCore/SessionPolicy.swift
+  d7380fe541df2300 1-27
+native/Tests/LangShotCoreTests/SessionPolicyTests.swift
+  d7380fe541df2300 1-15
+native/Sources/LangShotPlatform/SelectionOverlay.swift
+  d7380fe541df2300 1-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "d457548065d1c1121d72580410268c0566822cd8",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 1913,
+      "total_deletions": 1634,
+      "accepted_lines": 1906,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/e38fc3448447fbd79b45761d63192325e580d3752ac672b83f13bd283180f92b"
+    }
+  }
+}
