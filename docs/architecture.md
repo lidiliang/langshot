@@ -30,7 +30,9 @@
 flowchart LR
   U["uTools 入口"] --> W["Plugin Web UI"]
   W <--> P["Preload / HelperClient"]
-  P <--> H["Swift langshot-helper"]
+  P --> M["Helper Materializer"]
+  M --> H["Swift langshot-helper"]
+  P <--> H
   H --> O["AppKit Overlay"]
   H --> C["CoreGraphics Capture"]
   H --> R["CGEvent Scroll Driver"]
@@ -42,7 +44,7 @@ flowchart LR
   X --> T
 ```
 
-插件目录只包含 UI、preload、协议类型和生命周期控制。`langshot-helper.app` 是无 Dock 图标的 agent application，拥有独立 bundle identifier 和权限归属；其可执行文件由 Swift Package 产出后包装进 `.app`。helper 通过 stdin/stdout JSON Lines 与唯一父插件通信，不监听网络端口。
+插件目录只包含 UI、preload、协议类型和生命周期控制。`langshot-helper.app` 是无 Dock 图标的 agent application，拥有独立 bundle identifier 和权限归属；其可执行文件由 Swift Package 产出后包装进 `.app`。UPXS 安装版启动时，preload 先读取包内 Helper，以二进制 SHA-256 为版本目录将其释放到 `Application Support/langShot/helper`，校验完整性并恢复执行权限，再从真实文件系统路径启动。helper 通过 stdin/stdout JSON Lines 与唯一父插件通信，不监听网络端口。
 
 ## Decisions
 
@@ -89,7 +91,7 @@ AppKit 能稳定覆盖其他应用、处理多显示器坐标，并把权限、�
 
 **Choice**
 
-preload 以 `child_process.spawn` 启动 helper；stdin/stdout 传输 UTF-8 JSON Lines。每条消息含 `protocolVersion`、`type`、`requestId`，事件另含 `sessionId` 和单调递增 `sequence`。stderr 仅输出不含截图内容的诊断日志。
+preload 以 `child_process.spawn` 启动真实文件系统中的 helper；stdin/stdout 传输 UTF-8 JSON Lines。开发源码缺少 bundled Helper 时直接使用 Swift debug 产物；开发打包和 UPXS 安装版则先执行内容寻址的 Helper materialization，避免对 ASAR/UPXS 虚拟路径调用 `spawn` 产生 `ENOTDIR`。每条消息含 `protocolVersion`、`type`、`requestId`，事件另含 `sessionId` 和单调递增 `sequence`。stderr 仅输出不含截图内容的诊断日志。
 
 核心命令包括 `hello`、`permissions.get/request/openSettings`、`session.begin`、`selection.*`、`scroll.anchor/setSpeed`、`session.pause/resume/finish/discard`、`editor.export` 和 `session.recover`。核心事件包括 `state.changed`、`selection.changed`、`progress`、`pause.required`、`completed` 和 `error`。
 
@@ -105,7 +107,7 @@ preload 以 `child_process.spawn` 启动 helper；stdin/stdout 传输 UTF-8 JSON
 
 **Consequences**
 
-协议必须处理半行、坏行、请求超时和进程退出；预览文件只可通过 `(sessionId, tileId)` 白名单读取，UI 不能传入任意本地路径。
+协议必须处理半行、坏行、请求超时和进程退出；Helper 释放目录必须校验内容哈希、以原子 rename 安装并在启动前验证执行权限；预览文件只可通过 `(sessionId, tileId)` 白名单读取，UI 不能传入任意本地路径。
 
 ### D4. 显式、可恢复的会话状态机
 
@@ -258,6 +260,7 @@ Swift Package 是源码权威；正式公证验收要等完整 Xcode 与证书�
 | WebP 在 10.15 支持不足 | 格式缺失 | ImageIO 能力探测 + bundled libwebp fallback | 10.15 解码/编码测试和包体报告 |
 | TCC 权限与 bundle/signature 变化 | 重复授权或无法滚动 | 稳定 helper bundle id；开发/正式签名文档 | 权限拒绝、授权、升级测试 |
 | uTools 关闭或重载 renderer | helper 泄漏或会话丢失 | parent-death 检测、心跳、原子 manifest | 进程退出与恢复集成测试 |
+| UPXS 虚拟路径不能直接执行 Helper | 安装版启动时报 `spawn ENOTDIR` | 内容寻址释放到真实应用数据目录，校验哈希与执行权限 | 安装布局 materialization 单测 + Helper `hello` 冒烟测试 |
 | Intel 性能较低 | 采样降频 | 正确性优先的自适应探针频率 | Intel 功能矩阵与降频状态事件 |
 | 当前缺少完整 Xcode | 无法本轮完成公证 | 分离开发构建与发布门禁 | 开发构建成功；发布步骤标记外部前置条件 |
 
@@ -269,4 +272,4 @@ Swift Package 是源码权威；正式公证验收要等完整 Xcode 与证书�
 4. 黄金图测试：已知滚动偏移、动态宽度、固定顶/底栏、低纹理、动画噪声、向上/向下。
 5. 性能测试：1440×60,000，记录帧率、CPU、RSS、磁盘、编码时间和输出 hash/尺寸。
 6. 手工系统测试：权限、覆盖层排除、多屏单选、六应用兼容矩阵、uTools 生命周期。
-7. 构建测试：Universal 架构、deployment target、包体小于 20MB、未签名路径、凭据存在时签名/公证路径。
+7. 构建测试：Universal 架构、deployment target、包体小于 20MB、UPXS 安装布局 Helper 释放与 `hello`、未签名路径、凭据存在时签名/公证路径。

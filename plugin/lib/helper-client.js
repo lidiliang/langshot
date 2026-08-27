@@ -2,14 +2,20 @@
 
 const { EventEmitter } = require('node:events')
 const { spawn } = require('node:child_process')
+const crypto = require('node:crypto')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const { createRequest, parseMessage } = require('./protocol')
+
+const helperBinaryRelativePath = path.join('Contents', 'MacOS', 'langshot-helper')
+const helperInfoRelativePath = path.join('Contents', 'Info.plist')
 
 class HelperClient extends EventEmitter {
   constructor(options = {}) {
     super()
-    this.helperPath = options.helperPath || resolveHelperPath()
+    this.helperPath = options.helperPath || null
+    this.helperPathResolver = options.helperPathResolver || (() => resolveHelperPath({ installRoot: options.helperInstallRoot }))
     this.spawnProcess = options.spawnProcess || spawn
     this.timeoutMs = options.timeoutMs || 5000
     this.process = null
@@ -19,6 +25,7 @@ class HelperClient extends EventEmitter {
 
   start() {
     if (this.process) return
+    if (!this.helperPath) this.helperPath = this.helperPathResolver()
     if (!fs.existsSync(this.helperPath)) {
       throw new Error(`langShot helper not found: ${this.helperPath}`)
     }
@@ -115,10 +122,79 @@ function toHelperError(value) {
   return error
 }
 
-function resolveHelperPath() {
-  const bundled = path.join(__dirname, '..', 'native', 'langshot-helper.app', 'Contents', 'MacOS', 'langshot-helper')
-  const development = path.resolve(__dirname, '..', '..', 'native', '.build', 'debug', 'langshot-helper')
-  return fs.existsSync(bundled) ? bundled : development
+function resolveHelperPath(options = {}) {
+  const bundledApp = options.bundledApp || path.join(__dirname, '..', 'native', 'langshot-helper.app')
+  const bundledBinary = path.join(bundledApp, helperBinaryRelativePath)
+  const development = options.development || path.resolve(__dirname, '..', '..', 'native', '.build', 'debug', 'langshot-helper')
+  if (!fs.existsSync(bundledBinary)) return development
+  return materializeBundledHelper(bundledApp, options.installRoot || resolveHelperInstallRoot())
 }
 
-module.exports = { HelperClient, resolveHelperPath }
+function resolveHelperInstallRoot() {
+  const appData = globalThis.utools && typeof globalThis.utools.getPath === 'function'
+    ? globalThis.utools.getPath('appData')
+    : path.join(os.homedir(), 'Library', 'Application Support')
+  return path.join(appData, 'langShot', 'helper')
+}
+
+function materializeBundledHelper(sourceApp, installRoot) {
+  const sourceBinary = path.join(sourceApp, helperBinaryRelativePath)
+  const sourceInfo = path.join(sourceApp, helperInfoRelativePath)
+  if (!fs.existsSync(sourceBinary) || !fs.existsSync(sourceInfo)) {
+    throw new Error(`langShot helper bundle is incomplete: ${sourceApp}`)
+  }
+
+  const binary = fs.readFileSync(sourceBinary)
+  const info = fs.readFileSync(sourceInfo)
+  const digest = helperBundleDigest(binary, info)
+  const versionRoot = path.join(installRoot, digest)
+  const targetApp = path.join(versionRoot, 'langshot-helper.app')
+  const targetBinary = path.join(targetApp, helperBinaryRelativePath)
+  const targetInfo = path.join(targetApp, helperInfoRelativePath)
+
+  if (hasExpectedHelper(targetBinary, targetInfo, digest)) {
+    fs.chmodSync(targetBinary, 0o755)
+    return targetBinary
+  }
+
+  fs.mkdirSync(installRoot, { recursive: true, mode: 0o700 })
+  const stagingRoot = `${versionRoot}.staging-${process.pid}-${Date.now()}`
+  const stagingApp = path.join(stagingRoot, 'langshot-helper.app')
+  const stagingBinary = path.join(stagingApp, helperBinaryRelativePath)
+  const stagingInfo = path.join(stagingApp, helperInfoRelativePath)
+
+  try {
+    fs.mkdirSync(path.dirname(stagingBinary), { recursive: true })
+    fs.writeFileSync(stagingInfo, info)
+    fs.writeFileSync(stagingBinary, binary, { mode: 0o755 })
+    fs.chmodSync(stagingBinary, 0o755)
+    fs.rmSync(versionRoot, { recursive: true, force: true })
+    fs.renameSync(stagingRoot, versionRoot)
+  } finally {
+    fs.rmSync(stagingRoot, { recursive: true, force: true })
+  }
+
+  if (!hasExpectedHelper(targetBinary, targetInfo, digest)) {
+    throw new Error(`langShot helper could not be installed: ${targetBinary}`)
+  }
+  return targetBinary
+}
+
+function hasExpectedHelper(binaryPath, infoPath, expectedDigest) {
+  if (!fs.existsSync(binaryPath) || !fs.existsSync(infoPath)) return false
+  try {
+    return helperBundleDigest(fs.readFileSync(binaryPath), fs.readFileSync(infoPath)) === expectedDigest
+  } catch {
+    return false
+  }
+}
+
+function helperBundleDigest(binary, info) {
+  return crypto.createHash('sha256')
+    .update(binary)
+    .update(Buffer.from([0]))
+    .update(info)
+    .digest('hex')
+}
+
+module.exports = { HelperClient, materializeBundledHelper, resolveHelperPath }

@@ -21,8 +21,21 @@ test('uTools commands remain unique after case-insensitive normalization', () =>
   const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'plugin.json'), 'utf8'))
   const commands = manifest.features.flatMap(feature => feature.cmds || [])
   const normalized = commands.map(command => String(command).trim().toLocaleLowerCase('en-US'))
+  assert.equal(manifest.pluginName, '滚动长截图')
   assert.equal(new Set(normalized).size, normalized.length)
-  assert.deepEqual(commands.filter(command => /^langshot$/i.test(command)), ['langShot'])
+  assert.deepEqual(commands, ['长截屏', '滚动截屏', '滚动截图', 'langShot'])
+})
+
+test('release metadata is synchronized for version 1.0.0', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'plugin', 'plugin.json'), 'utf8'))
+  const packageMetadata = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
+  const helperInfo = fs.readFileSync(path.join(projectRoot, 'scripts', 'helper-Info.plist'), 'utf8')
+
+  assert.equal(manifest.version, '1.0.0')
+  assert.equal(packageMetadata.version, manifest.version)
+  assert.match(helperInfo, /<key>CFBundleShortVersionString<\/key><string>1\.0\.0<\/string>/)
+  assert.equal(manifest.homepage, 'https://github.com/lidiliang/langshot')
 })
 
 test('the reused uTools page resets whenever the plugin is entered', () => {

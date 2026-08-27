@@ -1,9 +1,9 @@
 {
-  "pluginName": "langShot",
+  "pluginName": "滚动长截图",
   "description": "高清、自动拼接的 macOS 滚动长截图工具",
   "author": "langShot",
-  "homepage": "https://github.com/langshot/langshot",
-  "version": "0.1.0",
+  "homepage": "https://github.com/lidiliang/langshot",
+  "version": "1.0.0",
   "logo": "logo.png",
   "main": "index.html",
   "preload": "preload.js",
@@ -12,7 +12,7 @@
     {
       "code": "langshot.capture",
       "explain": "开始滚动长截图",
-      "cmds": ["长截图", "长截屏", "滚动截图", "langShot"]
+      "cmds": ["长截屏", "滚动截屏", "滚动截图", "langShot"]
     }
   ]
 }

@@ -8,7 +8,7 @@
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>langshot-helper</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>10.15</string>
   <key>LSUIElement</key><true/>
@@ -16,4 +16,3 @@
   <key>NSScreenCaptureUsageDescription</key><string>langShot 需要屏幕录制权限来生成长截图，图像只在本机处理。</string>
 </dict>
 </plist>
-
