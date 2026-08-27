@@ -45,7 +45,12 @@
 
 ### Requirement: Save destinations
 
-系统 SHALL 支持保存到桌面和用户选择的路径，使用无冲突文件名，并 MUST 在写入失败时保留当前会话以便重试。
+系统 SHALL 将截图完成后的 PNG 写入 `~/langshots/` 而非系统临时目录或桌面，首次保存时自动创建该目录，并使用无冲突文件名。langShot 每次启动时 SHALL 删除该目录内修改时间严格超过 7×24 小时、名称以 `langShot-` 开头且扩展名为受支持图片格式的普通文件；MUST NOT 跟随符号链接或删除无关文件。后续显式导出 SHALL 支持其他用户选择的路径，并 MUST 在写入失败时保留当前会话以便重试。
+
+#### Scenario: Capture completes
+
+- **WHEN** 长截图完成且 `~/langshots/` 尚不存在
+- **THEN** 系统创建该目录并以唯一文件名保存 PNG，桌面和系统临时目录不会自动出现结果文件
 
 #### Scenario: Destination is not writable
 
@@ -60,3 +65,17 @@
 
 - **WHEN** 系统或目标格式无法接受生成的长图
 - **THEN** 界面报告复制失败并突出显示保存 PNG 操作，不关闭编辑器
+
+#### Scenario: Clipboard write succeeds
+
+- **WHEN** 用户点击“复制图片”且图片成功写入剪贴板
+- **THEN** 结果界面显示不会被其他面板遮挡的成功提示，同时把复制按钮短暂切换为“已复制”状态，随后自动退出 langShot 插件页面
+
+### Requirement: Fresh plugin entry state
+
+uTools MAY 复用同一个 Web 页面实例，但 langShot MUST 在每次 `onPluginEnter` 时呈现新的默认首页，并 SHALL 隔离前后两次 helper 进程的退出事件。
+
+#### Scenario: User reopens after copying a result
+
+- **WHEN** 复制成功自动退出后，用户再次通过 uTools 搜索进入 langShot
+- **THEN** 页面恢复自动模式、向下方向和可用的“选择截图区域”按钮，不显示旧图片、旧路径、旧复制状态或旧提示；前一个 helper 的延迟退出不得中断新 helper

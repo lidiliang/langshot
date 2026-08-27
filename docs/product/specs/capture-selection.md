@@ -9,7 +9,17 @@
 #### Scenario: Screen recording permission is denied
 
 - **WHEN** 用户启动截图但屏幕录制权限不可用
-- **THEN** 系统显示所缺权限、打开系统设置的操作入口和授权后重试入口，且不创建采集会话
+- **THEN** 系统显示阻断式授权引导弹窗，解释权限用途、提示在系统设置中查找 `langshot-helper`（部分系统可能显示为 `uTools`）、提供请求授权和对应设置页入口，并提供“我已授权，重新检测”操作；授权成功前不创建采集会话
+
+#### Scenario: Multiple required permissions are missing
+
+- **WHEN** 自动滚动模式同时缺少屏幕录制和辅助功能权限
+- **THEN** 引导弹窗逐项列出两项权限及各自用途，用户可以分别请求授权，重新检测时只保留仍缺失的项目
+
+#### Scenario: macOS requires the application to reopen
+
+- **WHEN** 用户打开权限开关且 macOS 提示退出并重新打开应用
+- **THEN** 引导明确要求遵循系统提示，并说明重新进入 langShot 后再次检测权限
 
 #### Scenario: Manual capture does not need accessibility permission
 
@@ -20,6 +30,31 @@
 
 系统 SHALL 允许用户在任意单块显示器内拖拽选区，通过四边、四角和键盘进行像素级调整，并 MUST 阻止选区跨越显示器边界。
 
+#### Scenario: Pointer recommends an accessible element
+
+- **WHEN** 鼠标移动到目标应用暴露的网页内容区、侧栏、列表、表格、对话框或其他可访问元素上
+- **THEN** 系统实时高亮一个位于当前显示器内的元素级候选区域，且不立即锁定或开始截图
+
+#### Scenario: Element recommendation is unavailable
+
+- **WHEN** 目标应用没有暴露可靠的辅助功能元素，或当前没有辅助功能权限
+- **THEN** 系统回退到鼠标下方的应用窗口候选，用户仍可自由拖拽框选
+
+#### Scenario: Recommended region is clicked
+
+- **WHEN** 用户单击当前推荐区域
+- **THEN** 系统锁定该候选并显示四边、四角及最终确认操作，但用户仍可移动、缩放或重新框选
+
+#### Scenario: Locked recommendation is finally confirmed
+
+- **WHEN** 用户点击“确认选区”或按 `Enter`
+- **THEN** 系统才把当前可调整选区提交给后续锚点或采集流程
+
+#### Scenario: User finishes a freeform drag
+
+- **WHEN** 用户自由拖拽出有效选区并松开鼠标，或移动/缩放已锁定选区后松开鼠标
+- **THEN** 系统立即确认最终矩形并进入后续流程，不要求再点击一次“确认选区”
+
 #### Scenario: Selection reaches a display edge
 
 - **WHEN** 用户把选区手柄拖过当前显示器边缘
@@ -28,7 +63,7 @@
 #### Scenario: User reselects or cancels
 
 - **WHEN** 用户点击重新框选或在框选阶段按 `Esc`
-- **THEN** 系统分别清除当前选区并重新进入框选，或退出截图且不保留临时帧
+- **THEN** 系统分别清除当前选区并重新进入框选，或立即退出截图且不保留临时帧；即使遮罩视图不是当前键盘焦点也必须响应 `Esc`
 
 ### Requirement: Native-pixel capture
 

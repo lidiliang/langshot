@@ -4,7 +4,7 @@
   "author": "langShot",
   "homepage": "https://github.com/langshot/langshot",
   "version": "0.1.0",
-  "logo": "logo.svg",
+  "logo": "logo.png",
   "main": "index.html",
   "preload": "preload.js",
   "platform": ["darwin"],
@@ -12,8 +12,7 @@
     {
       "code": "langshot.capture",
       "explain": "开始滚动长截图",
-      "cmds": ["长截图", "长截屏", "滚动截图", "langShot", "longshot"]
+      "cmds": ["长截图", "长截屏", "滚动截图", "langShot"]
     }
   ]
 }
-

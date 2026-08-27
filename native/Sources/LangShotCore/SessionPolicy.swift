@@ -13,10 +13,10 @@ public struct SessionPolicy: Sendable {
         self.stationaryProbeLimit = stationaryProbeLimit
     }
 
-    public func boundary(mode: CaptureMode, elapsed: TimeInterval, currentHeight: Int, proposedAdditionalHeight: Int, stationaryProbes: Int) -> SessionBoundary {
+    public func boundary(mode: CaptureMode, elapsed: TimeInterval, currentHeight: Int, proposedAdditionalHeight: Int, stationaryProbes: Int, hasObservedMovement: Bool = true) -> SessionBoundary {
         if currentHeight + max(0, proposedAdditionalHeight) >= maximumHeight { return .heightLimit }
         if mode == .automatic && elapsed >= maximumAutomaticDuration { return .durationLimit }
-        if stationaryProbes >= stationaryProbeLimit { return .suspectedEnd }
+        if hasObservedMovement && stationaryProbes >= stationaryProbeLimit { return .suspectedEnd }
         return .none
     }
 
@@ -24,4 +24,3 @@ public struct SessionPolicy: Sendable {
         max(0, min(proposed, maximumHeight - currentHeight))
     }
 }
-

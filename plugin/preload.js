@@ -22,11 +22,20 @@ window.langShot = Object.freeze({
     listeners.add(listener)
     return () => listeners.delete(listener)
   },
+  onPluginEnter(listener) {
+    if (typeof listener !== 'function') throw new TypeError('listener must be a function')
+    if (globalThis.utools) utools.onPluginEnter(listener)
+    else window.addEventListener('focus', listener)
+  },
   hideMainWindow() {
     if (globalThis.utools) utools.hideMainWindow()
   },
   showMainWindow() {
     if (globalThis.utools) utools.showMainWindow()
+  },
+  closePlugin() {
+    if (globalThis.utools) utools.outPlugin()
+    else window.close()
   },
   chooseSavePath(defaultName) {
     if (!globalThis.utools) return null

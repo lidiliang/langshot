@@ -9,9 +9,18 @@ public final class SelectionOverlayController: NSObject {
     private let display: NativeDisplay
     private let window: NSPanel
     private let overlayView: SelectionOverlayView
+    private let candidateService = SelectionCandidateService()
+    private let candidateQueue = DispatchQueue(label: "app.langshot.selection-candidate", qos: .userInteractive)
     private let onConfirm: Confirmation
     private let onCancel: () -> Void
     private var onAnchor: ((PointValue) -> Void)?
+    private var captureControls: CaptureControlPanelController?
+    private var candidateGeneration = 0
+    private var candidateLookupInFlight = false
+    private var pendingCandidatePoint: NSPoint?
+    private var localKeyMonitor: Any?
+    private var globalKeyMonitor: Any?
+    private var isActive = false
 
     public init(display: NativeDisplay, onConfirm: @escaping Confirmation, onCancel: @escaping () -> Void) {
         self.display = display
@@ -19,7 +28,7 @@ public final class SelectionOverlayController: NSObject {
         self.onCancel = onCancel
         window = NSPanel(
             contentRect: NSRect(origin: .zero, size: display.screen.frame.size),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false,
             screen: display.screen
@@ -30,12 +39,20 @@ public final class SelectionOverlayController: NSObject {
     }
 
     public func show() {
+        isActive = true
+        installSelectionKeyMonitors()
         NSApp.activate(ignoringOtherApps: true)
-        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(overlayView)
     }
 
-    public func close() { window.orderOut(nil) }
+    public func close() {
+        isActive = false
+        removeSelectionKeyMonitors()
+        captureControls?.close()
+        captureControls = nil
+        window.orderOut(nil)
+    }
 
     private func configureWindow() {
         window.level = .screenSaver
@@ -44,6 +61,7 @@ public final class SelectionOverlayController: NSObject {
         window.isOpaque = false
         window.hasShadow = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        window.acceptsMouseMovedEvents = true
         window.ignoresMouseEvents = false
         window.contentView = overlayView
         overlayView.onConfirm = { [weak self] localRect in
@@ -57,11 +75,48 @@ public final class SelectionOverlayController: NSObject {
             )
             self.onConfirm(self.display, global, CGWindowID(self.window.windowNumber))
         }
-        overlayView.onCancel = { [weak self] in self?.onCancel() }
+        overlayView.onCancel = { [weak self] in self?.cancelSelection() }
+        overlayView.onHover = { [weak self] point in self?.resolveCandidate(at: point) }
         overlayView.onAnchor = { [weak self] localPoint in
             guard let self else { return }
             let frame = self.display.geometry.pointBounds
             self.onAnchor?(PointValue(x: frame.minX + localPoint.x, y: frame.minY + localPoint.y))
+        }
+    }
+
+    private func resolveCandidate(at localPoint: NSPoint) {
+        pendingCandidatePoint = localPoint
+        startCandidateLookupIfNeeded()
+    }
+
+    private func startCandidateLookupIfNeeded() {
+        guard !candidateLookupInFlight, let localPoint = pendingCandidatePoint else { return }
+        pendingCandidatePoint = nil
+        candidateLookupInFlight = true
+        candidateGeneration += 1
+        let generation = candidateGeneration
+        let pointBounds = display.geometry.pointBounds
+        let displayBounds = CGRect(
+            x: pointBounds.origin.x,
+            y: pointBounds.origin.y,
+            width: pointBounds.size.width,
+            height: pointBounds.size.height
+        )
+        let globalPoint = CGPoint(x: displayBounds.minX + localPoint.x, y: displayBounds.minY + localPoint.y)
+        let service = candidateService
+        candidateQueue.async { [weak self] in
+            let candidate = service.candidate(at: globalPoint, inside: displayBounds)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.candidateLookupInFlight = false
+                if generation == self.candidateGeneration, self.pendingCandidatePoint == nil {
+                    let localRect = candidate.map {
+                        NSRect(x: $0.rect.minX - displayBounds.minX, y: $0.rect.minY - displayBounds.minY, width: $0.rect.width, height: $0.rect.height)
+                    }
+                    self.overlayView.updateCandidate(localRect, source: candidate?.source)
+                }
+                self.startCandidateLookupIfNeeded()
+            }
         }
     }
 
@@ -71,16 +126,61 @@ public final class SelectionOverlayController: NSObject {
         overlayView.needsDisplay = true
     }
 
-    public func beginCapturing(status: String) {
+    public func beginCapturing(status: String, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        removeSelectionKeyMonitors()
+        window.styleMask = [.borderless, .nonactivatingPanel]
+        window.resignKey()
         overlayView.phase = .capturing
         overlayView.status = status
         overlayView.needsDisplay = true
+        window.hidesOnDeactivate = false
         window.ignoresMouseEvents = true
+        captureControls = CaptureControlPanelController(
+            screen: display.screen,
+            onTogglePause: onTogglePause,
+            onFinish: onFinish,
+            onCancel: onCancel
+        )
+        captureControls?.update(status: status, paused: false)
+        captureControls?.show()
+        window.orderFrontRegardless()
     }
 
-    public func updateStatus(_ status: String) {
+    public func ensureCaptureUIVisible() {
+        guard overlayView.phase == .capturing else { return }
+        window.orderFrontRegardless()
+        captureControls?.show()
+    }
+
+    public func updateStatus(_ status: String, paused: Bool = false, finishing: Bool = false) {
         overlayView.status = status
         overlayView.needsDisplay = true
+        captureControls?.update(status: status, paused: paused, finishing: finishing)
+    }
+
+    private func installSelectionKeyMonitors() {
+        removeSelectionKeyMonitors()
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, event.isARepeat == false else { return event }
+            self?.cancelSelection()
+            return nil
+        }
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, event.isARepeat == false else { return }
+            self?.cancelSelection()
+        }
+    }
+
+    private func removeSelectionKeyMonitors() {
+        if let localKeyMonitor { NSEvent.removeMonitor(localKeyMonitor); self.localKeyMonitor = nil }
+        if let globalKeyMonitor { NSEvent.removeMonitor(globalKeyMonitor); self.globalKeyMonitor = nil }
+    }
+
+    private func cancelSelection() {
+        guard isActive else { return }
+        isActive = false
+        removeSelectionKeyMonitors()
+        onCancel()
     }
 }
 
@@ -92,11 +192,15 @@ private final class SelectionOverlayView: NSView {
     var onConfirm: ((NSRect) -> Void)?
     var onCancel: (() -> Void)?
     var onAnchor: ((NSPoint) -> Void)?
+    var onHover: ((NSPoint) -> Void)?
     var phase: Phase = .selecting
     var status = ""
     private var dragStart: NSPoint?
     private var dragMode: DragMode?
     private var selection: NSRect?
+    private var hoverCandidate: NSRect?
+    private var hoverSource: SelectionCandidate.Source?
+    private var clickCandidate: NSRect?
     private let minimumSize: CGFloat = 24
     private let toolbar = NSStackView()
     private let confirmButton = NSButton(title: "确认选区", target: nil, action: nil)
@@ -126,6 +230,11 @@ private final class SelectionOverlayView: NSView {
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
 
+    override func mouseMoved(with event: NSEvent) {
+        guard phase == .selecting, selection == nil, dragMode == nil else { return }
+        onHover?(convert(event.locationInWindow, from: nil))
+    }
+
     override func mouseDown(with event: NSEvent) {
         if phase == .anchor {
             let point = convert(event.locationInWindow, from: nil)
@@ -141,7 +250,8 @@ private final class SelectionOverlayView: NSView {
             dragMode = .moving(selection)
         } else {
             dragMode = .drawing
-            selection = nil
+            clickCandidate = selection == nil ? hoverCandidate : nil
+            if selection != nil { selection = nil }
         }
         needsDisplay = true
     }
@@ -152,7 +262,12 @@ private final class SelectionOverlayView: NSView {
         let point = convert(event.locationInWindow, from: nil)
         switch dragMode {
         case .drawing:
-            selection = normalizedRect(from: start, to: point).intersection(bounds)
+            let rect = normalizedRect(from: start, to: point).intersection(bounds)
+            if rect.width >= 3 || rect.height >= 3 {
+                hoverCandidate = nil
+                hoverSource = nil
+                selection = rect
+            }
         case let .moving(original):
             selection = move(original, dx: point.x - start.x, dy: point.y - start.y)
         case let .resizing(handle, original):
@@ -163,9 +278,34 @@ private final class SelectionOverlayView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         mouseDragged(with: event)
+        let endPoint = convert(event.locationInWindow, from: nil)
+        let movedEnough = dragStart.map { hypot(endPoint.x - $0.x, endPoint.y - $0.y) >= 3 } ?? false
+        var shouldAutoConfirm = false
+        if case .drawing = dragMode {
+            if movedEnough, let selection, selection.width >= minimumSize, selection.height >= minimumSize {
+                hoverCandidate = nil
+                hoverSource = nil
+                shouldAutoConfirm = true
+            } else if let clickCandidate, clickCandidate.contains(endPoint) {
+                selection = clickCandidate
+                hoverCandidate = nil
+                hoverSource = nil
+            } else {
+                selection = nil
+            }
+        } else if movedEnough, let selection, selection.width >= minimumSize, selection.height >= minimumSize {
+            shouldAutoConfirm = true
+        }
         dragStart = nil
         dragMode = nil
+        clickCandidate = nil
+        if shouldAutoConfirm, let selection {
+            toolbar.isHidden = true
+            onConfirm?(selection)
+            return
+        }
         updateToolbar()
+        needsDisplay = true
     }
 
     override func keyDown(with event: NSEvent) {
@@ -188,24 +328,30 @@ private final class SelectionOverlayView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor(calibratedWhite: 0.02, alpha: 0.58).setFill()
         bounds.fill()
-        guard let selection else {
+        guard let visibleRect = selection ?? hoverCandidate else {
             toolbar.isHidden = true
-            drawHint("拖拽选择截图区域 · Esc 取消")
+            drawHint("移动鼠标智能选择 · 拖拽自由框选 · Esc 取消")
             return
         }
         NSGraphicsContext.saveGraphicsState()
         NSColor.clear.setFill()
-        selection.fill(using: .copy)
+        visibleRect.fill(using: .copy)
         NSGraphicsContext.restoreGraphicsState()
-        let border = NSBezierPath(roundedRect: selection, xRadius: 2, yRadius: 2)
+        let border = NSBezierPath(roundedRect: visibleRect, xRadius: 2, yRadius: 2)
         border.lineWidth = 2
         NSColor(calibratedRed: 0.24, green: 0.55, blue: 1, alpha: 1).setStroke()
         border.stroke()
-        drawHandles(selection)
+        if selection != nil { drawHandles(visibleRect) }
         switch phase {
         case .selecting:
-            updateToolbar()
-            drawSelectionSize(selection)
+            if selection != nil {
+                updateToolbar()
+                drawSelectionSize(visibleRect)
+            } else {
+                toolbar.isHidden = true
+                let kind = hoverSource == .accessibilityElement ? "元素" : "窗口"
+                drawHint("已推荐\(kind) · 单击锁定 · 拖拽自由框选")
+            }
         case .anchor: drawHint("点击选区内需要滚动的位置")
         case .capturing: drawHint(status.isEmpty ? "长截图中…" : status)
         }
@@ -272,7 +418,12 @@ private final class SelectionOverlayView: NSView {
 
     @objc private func resetSelection() {
         selection = nil
+        hoverCandidate = nil
+        hoverSource = nil
         toolbar.isHidden = true
+        if let window {
+            onHover?(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+        }
         needsDisplay = true
     }
 
@@ -333,5 +484,12 @@ private final class SelectionOverlayView: NSView {
 
     private func normalizedRect(from start: NSPoint, to end: NSPoint) -> NSRect {
         NSRect(x: min(start.x, end.x), y: min(start.y, end.y), width: abs(end.x - start.x), height: abs(end.y - start.y))
+    }
+
+    func updateCandidate(_ rect: NSRect?, source: SelectionCandidate.Source?) {
+        guard phase == .selecting, selection == nil, dragMode == nil else { return }
+        hoverCandidate = rect?.intersection(bounds)
+        hoverSource = source
+        needsDisplay = true
     }
 }

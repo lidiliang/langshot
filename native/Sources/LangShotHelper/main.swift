@@ -20,10 +20,14 @@ final class HelperRuntime {
     private var engine: CaptureSessionEngine?
     private var sequence = 0
     private var activeSessionId: String?
-    private var keyMonitor: Any?
-    private var escapePaused = false
+    private var localKeyMonitor: Any?
+    private var globalKeyMonitor: Any?
+    private var capturePaused = false
 
-    init(writer: ProtocolWriter) { self.writer = writer }
+    init(writer: ProtocolWriter) {
+        self.writer = writer
+        _ = try? CaptureSessionEngine.cleanupExpiredResults()
+    }
 
     @MainActor
     func handle(_ request: RequestEnvelope) {
@@ -39,17 +43,20 @@ final class HelperRuntime {
                 let kind = request.payload["kind"] == .string("accessibility") ? PermissionKind.accessibility : .screenRecording
                 respond(request, ["granted": .bool(permissionService.request(kind))])
             case "permissions.openSettings":
-                let mode = request.payload["mode"] == .string("automatic") ? PermissionKind.accessibility : .screenRecording
-                permissionService.openSettings(mode)
+                let kind: PermissionKind
+                if request.payload["kind"] == .string("accessibility") {
+                    kind = .accessibility
+                } else if request.payload["kind"] == .string("screenRecording") {
+                    kind = .screenRecording
+                } else {
+                    kind = request.payload["mode"] == .string("automatic") ? .accessibility : .screenRecording
+                }
+                permissionService.openSettings(kind)
                 respond(request, [:])
             case "session.begin":
                 beginSession(request)
             case "session.discard":
-                engine?.cancel(); engine = nil
-                removeKeyMonitor()
-                overlay?.close(); overlay = nil
-                emit("session.cancelled", sessionId: activeSessionId)
-                activeSessionId = nil
+                discardSession(sessionId: activeSessionId)
                 respond(request, [:])
             default:
                 writer.write(ResponseEnvelope(requestId: request.requestId, error: ProtocolFailure(code: "UNIMPLEMENTED", message: "Request is not implemented yet: \(request.type)")))
@@ -95,11 +102,7 @@ final class HelperRuntime {
                 self.startEngine(sessionId: sessionId, mode: mode, direction: requestedDirection, selection: selection, windowID: windowID, anchor: nil)
             }
         }, onCancel: { [weak self] in
-            self?.engine?.cancel(); self?.engine = nil
-            self?.removeKeyMonitor()
-            self?.overlay?.close(); self?.overlay = nil
-            self?.emit("session.cancelled", sessionId: sessionId)
-            self?.activeSessionId = nil
+            self?.discardSession(sessionId: sessionId)
         })
         overlay?.show()
         respond(request, ["sessionId": .string(sessionId)])
@@ -107,8 +110,12 @@ final class HelperRuntime {
 
     @MainActor
     private func startEngine(sessionId: String, mode: CaptureMode, direction: ScrollDirection, selection: RectValue, windowID: CGWindowID, anchor: PointValue?) {
-        overlay?.beginCapturing(status: "长截图中… 0px · 0 帧")
         installKeyMonitor(sessionId: sessionId)
+        let targetPoint = anchor ?? PointValue(
+            x: selection.origin.x + selection.size.width / 2,
+            y: selection.origin.y + selection.size.height / 2
+        )
+        let targetPID = SelectionCandidateService().processIdentifier(at: CGPoint(x: targetPoint.x, y: targetPoint.y))
         engine = CaptureSessionEngine(
             sessionId: sessionId,
             mode: mode,
@@ -116,59 +123,122 @@ final class HelperRuntime {
             selection: selection,
             overlayWindowId: windowID,
             anchor: anchor,
+            targetProcessIdentifier: targetPID,
             progress: { [weak self] progress in
-                self?.overlay?.updateStatus("长截图中… \(progress.height)px · \(progress.frames) 帧")
-                self?.emit("session.progress", sessionId: sessionId, payload: [
+                guard let self else { return }
+                self.overlay?.updateStatus("长截图中… \(progress.height)px · \(progress.frames) 帧", paused: self.capturePaused)
+                self.emit("session.progress", sessionId: sessionId, payload: [
                     "height": .number(Double(progress.height)), "frames": .number(Double(progress.frames)), "confidence": .number(progress.confidence)
                 ])
+            },
+            status: { [weak self] status in
+                self?.handleEngineStatus(status, sessionId: sessionId)
             },
             completion: { [weak self] result in
                 guard let self else { return }
                 self.engine = nil; self.removeKeyMonitor(); self.overlay?.close(); self.overlay = nil
                 switch result {
-                case let .success(url): self.emit("session.completed", sessionId: sessionId, payload: ["path": .string(url.path)])
+                case let .success(result):
+                    self.emit("session.completed", sessionId: sessionId, payload: [
+                        "path": .string(result.url.path),
+                        "warnings": .array(result.warnings.map { .string($0.rawValue) })
+                    ])
                 case let .failure(error): self.emit("error", sessionId: sessionId, payload: ["code": .string("CAPTURE_FAILED"), "message": .string(error.localizedDescription)])
                 }
                 self.activeSessionId = nil
             }
         )
+        overlay?.beginCapturing(
+            status: "长截图中… 0px · 0 帧",
+            onTogglePause: { [weak self] in self?.togglePause(sessionId: sessionId) },
+            onFinish: { [weak self] in self?.finishSession() },
+            onCancel: { [weak self] in self?.discardSession(sessionId: sessionId) }
+        )
+        if let targetPID {
+            NSRunningApplication(processIdentifier: targetPID)?.activate(options: [.activateIgnoringOtherApps])
+        }
+        overlay?.ensureCaptureUIVisible()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.overlay?.ensureCaptureUIVisible()
+        }
         engine?.start()
     }
 
     @MainActor
     private func installKeyMonitor(sessionId: String) {
         removeKeyMonitor()
-        escapePaused = false
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        capturePaused = false
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == 53 {
-                if self.escapePaused {
-                    self.engine?.cancel(); self.engine = nil; self.removeKeyMonitor()
-                    self.overlay?.close(); self.overlay = nil
-                    self.emit("session.cancelled", sessionId: sessionId); self.activeSessionId = nil
-                } else {
-                    self.escapePaused = true; self.engine?.pause()
-                    self.overlay?.updateStatus("已暂停 · 空格继续 · ⌘↵ 完成 · Esc 丢弃")
-                    self.emit("session.paused", sessionId: sessionId, payload: ["reason": .string("escape")])
-                }
-                return nil
-            }
-            if self.escapePaused, event.keyCode == 49 {
-                self.escapePaused = false; self.engine?.resume()
-                self.overlay?.updateStatus("长截图中… · ⌘↵ 完成 · Esc 暂停")
-                self.emit("session.resumed", sessionId: sessionId)
-                return nil
-            }
-            if event.keyCode == 36, event.modifierFlags.contains(.command) {
-                self.engine?.finishNow(); return nil
-            }
-            return event
+            return self.handleCaptureKey(event, sessionId: sessionId) ? nil : event
+        }
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            _ = self?.handleCaptureKey(event, sessionId: sessionId)
+        }
+    }
+
+    @MainActor
+    private func handleCaptureKey(_ event: NSEvent, sessionId: String) -> Bool {
+        guard !event.isARepeat else { return true }
+        switch event.keyCode {
+        case 53:
+            if capturePaused { discardSession(sessionId: sessionId) }
+            else { engine?.pause() }
+            return true
+        case 49 where capturePaused:
+            engine?.resume()
+            return true
+        case 36, 76:
+            finishSession()
+            return true
+        default:
+            return false
+        }
+    }
+
+    @MainActor
+    private func togglePause(sessionId: String) {
+        guard activeSessionId == sessionId else { return }
+        if capturePaused { engine?.resume() }
+        else { engine?.pause() }
+    }
+
+    @MainActor
+    private func finishSession() { engine?.finishNow() }
+
+    @MainActor
+    private func discardSession(sessionId: String?) {
+        guard let sessionId, activeSessionId == sessionId else { return }
+        engine?.cancel(); engine = nil
+        removeKeyMonitor()
+        overlay?.close(); overlay = nil
+        emit("session.cancelled", sessionId: sessionId)
+        activeSessionId = nil
+    }
+
+    @MainActor
+    private func handleEngineStatus(_ status: CaptureEngineStatus, sessionId: String) {
+        switch status {
+        case .running:
+            let wasPaused = capturePaused
+            capturePaused = false
+            overlay?.updateStatus("长截图中… · Esc 暂停 · Enter 完成", paused: false)
+            if wasPaused { emit("session.resumed", sessionId: sessionId) }
+        case .paused:
+            let wasPaused = capturePaused
+            capturePaused = true
+            overlay?.updateStatus("已暂停", paused: true)
+            if !wasPaused { emit("session.paused", sessionId: sessionId, payload: ["reason": .string("user")]) }
+        case .finishing:
+            capturePaused = true
+            overlay?.updateStatus("正在生成长图…", paused: true, finishing: true)
         }
     }
 
     @MainActor
     private func removeKeyMonitor() {
-        if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
+        if let localKeyMonitor { NSEvent.removeMonitor(localKeyMonitor); self.localKeyMonitor = nil }
+        if let globalKeyMonitor { NSEvent.removeMonitor(globalKeyMonitor); self.globalKeyMonitor = nil }
     }
 
     private func respond(_ request: RequestEnvelope, _ payload: [String: JSONValue]) { writer.write(ResponseEnvelope(requestId: request.requestId, payload: payload)) }

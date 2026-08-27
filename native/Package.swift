@@ -13,7 +13,7 @@ let package = Package(
         .target(name: "LangShotCore"),
         .target(name: "LangShotPlatform", dependencies: ["LangShotCore"]),
         .executableTarget(name: "LangShotHelper", dependencies: ["LangShotCore", "LangShotPlatform"]),
-        .testTarget(name: "LangShotCoreTests", dependencies: ["LangShotCore"])
+        .testTarget(name: "LangShotCoreTests", dependencies: ["LangShotCore"]),
+        .testTarget(name: "LangShotPlatformTests", dependencies: ["LangShotPlatform", "LangShotCore"])
     ]
 )
-

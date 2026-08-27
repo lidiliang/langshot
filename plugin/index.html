@@ -10,7 +10,7 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <div class="brand"><img src="logo.svg" alt="" /><span>langShot</span></div>
+        <div class="brand"><img src="logo.png" alt="" /><span>langShot</span></div>
         <button class="icon-button" id="settingsButton" aria-label="设置">⌘</button>
       </header>
 
@@ -21,12 +21,12 @@
       </section>
 
       <section class="mode-grid" aria-label="截图模式">
-        <button class="mode-card selected" data-mode="manual">
+        <button class="mode-card" data-mode="manual">
           <span class="mode-icon">↕</span>
           <strong>手动滚动</strong>
           <small>滚动时可继续调整选区</small>
         </button>
-        <button class="mode-card" data-mode="automatic">
+        <button class="mode-card selected" data-mode="automatic">
           <span class="mode-icon">◎</span>
           <strong>自动滚动</strong>
           <small>指定锚点后自动完成</small>
@@ -39,20 +39,33 @@
         <button class="direction" data-direction="up">向上</button>
       </div>
 
-      <section class="permission-card" id="permissionCard" hidden>
-        <div><strong>需要系统权限</strong><p id="permissionMessage"></p></div>
-        <button class="secondary" id="openSettingsButton">前往设置</button>
-      </section>
-
       <footer class="actions">
         <div class="privacy-note"><span></span>截图不会离开这台 Mac</div>
         <button class="primary" id="startButton">选择截图区域</button>
       </footer>
       <section class="result-panel" id="resultPanel" hidden>
         <img id="resultImage" alt="长截图预览" />
-        <div class="result-meta"><strong>长截图已完成</strong><small id="resultPath"></small></div>
+        <div class="result-meta"><strong>长截图已保存到 ~/langshots/</strong><small id="resultPath"></small></div>
         <button class="secondary" id="revealButton">在访达中显示</button>
         <button class="primary compact" id="copyButton">复制图片</button>
+      </section>
+      <section class="permission-dialog" id="permissionDialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle" hidden>
+        <div class="permission-dialog-panel">
+          <div class="permission-badge">系统授权</div>
+          <h2 id="permissionTitle">需要完成权限设置</h2>
+          <p class="permission-lead">langShot 无法代替你修改 macOS 隐私设置。请按下面的项目逐项授权，完成前不会开始截图。</p>
+          <div class="permission-items" id="permissionItems"></div>
+          <ol class="permission-steps">
+            <li>点击权限项目右侧的“请求授权”。</li>
+            <li>在系统设置列表中找到 <strong>langshot-helper</strong>；部分系统可能显示为 <strong>uTools</strong>。</li>
+            <li>打开对应开关。若 macOS 要求退出并重新打开，请按系统提示操作。</li>
+          </ol>
+          <p class="permission-note">授权后回到 langShot，点击“我已授权，重新检测”。所有截图仍只在本机处理。</p>
+          <footer class="permission-actions">
+            <button class="secondary neutral" id="cancelPermissionButton">暂不授权</button>
+            <button class="primary compact" id="retryPermissionButton">我已授权，重新检测</button>
+          </footer>
+        </div>
       </section>
       <div class="toast" id="toast" role="status" hidden></div>
     </main>

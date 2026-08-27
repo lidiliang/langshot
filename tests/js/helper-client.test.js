@@ -25,12 +25,30 @@ test('HelperClient rejects pending work when the helper exits', async () => {
   await assert.rejects(response, /exited/)
 })
 
-function fakeChild() {
+test('a late exit from the previous helper cannot disconnect a reopened plugin', async () => {
+  const first = fakeChild({ exitOnKill: false })
+  const second = fakeChild()
+  const children = [first, second]
+  const client = new HelperClient({ helperPath: __filename, spawnProcess: () => children.shift(), timeoutMs: 100 })
+  const firstResponse = client.request('hello')
+  client.stop()
+  await assert.rejects(firstResponse, /stopped/)
+
+  const secondResponse = client.request('hello')
+  const request = JSON.parse(String(second.stdin.read()).trim())
+  first.emit('exit', 0, null)
+  assert.equal(client.process, second)
+  second.stdout.write(`${JSON.stringify({ protocolVersion: 1, type: 'response', requestId: request.requestId, ok: true, payload: { reopened: true } })}\n`)
+  assert.deepEqual(await secondResponse, { reopened: true })
+})
+
+function fakeChild({ exitOnKill = true } = {}) {
   const child = new EventEmitter()
   child.stdin = new PassThrough()
   child.stdout = new PassThrough()
   child.stderr = new PassThrough()
-  child.kill = () => child.emit('exit', 0, null)
+  child.kill = () => {
+    if (exitOnKill) child.emit('exit', 0, null)
+  }
   return child
 }
-

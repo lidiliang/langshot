@@ -15,15 +15,32 @@
 
 拼接器 SHALL 在相邻有效帧的共同横向区域内估计垂直位移，并 MUST 使用多条内容带的一致性和匹配分数生成置信度。
 
+拼接器 SHALL 保留最近若干有效位移，以中位数预测下一帧候选范围。每个最终段 MUST 来自已经捕获的无损帧及其验证过的重叠关系；滚动控制不能替代后台多帧拼接。
+
 #### Scenario: Valid overlapping frames are supplied
 
 - **WHEN** 两帧包含足够纹理且具有已知垂直重叠
 - **THEN** 估计位移位于验收容差内，仅把非重复内容追加到结果
 
+#### Scenario: A weak match agrees with recent motion
+
+- **WHEN** 候选置信度略低于常规阈值，但高于安全下限，且位移落在最近有效位移中位数的容差范围内
+- **THEN** 系统可按历史预测接受该候选；若位移明显跳变或绝对置信度过低则仍拒绝，避免重复纹理制造错误拼接
+
 #### Scenario: Content is ambiguous
 
-- **WHEN** 大面积纯色、动画或重复纹理使候选位移缺乏一致性
-- **THEN** 匹配结果标记为低置信度，会话暂停而不是静默接受
+- **WHEN** 大面积纯色、动画或重复纹理使多个候选位移近似同分，或候选不能满足最小重叠比例
+- **THEN** 匹配结果标记为低置信度且不追加错误大位移；采集器在后台重采，连续失败时重新同步并记录完成后完整性提示，不暂停用户流程
+
+#### Scenario: Repetitive rows create several exact matches
+
+- **WHEN** 周期性列表、表格或代码行使多个不同位移都得到相同或近似的最佳分数
+- **THEN** 系统判定结果存在歧义且拒绝该帧，不得因为单个候选的绝对相似度较高而接受它，也不得要求用户点击继续
+
+#### Scenario: Captured frames are composed vertically
+
+- **WHEN** 输入帧顶部和底部包含可区分的像素条带并生成最终长图
+- **THEN** 每帧内部的上下像素方向和帧间的阅读顺序均与屏幕内容一致，不得上下翻转
 
 ### Requirement: Static region suppression
 
@@ -38,6 +55,11 @@
 
 - **WHEN** 底部输入栏在多帧中固定而聊天内容滚动
 - **THEN** 输入栏只在最终图底部出现一次，滚动正文保持连续
+
+#### Scenario: Fixed sidebars remain unchanged
+
+- **WHEN** 左侧导航、右侧工具栏或空白边带在滚动前后保持屏幕坐标不变
+- **THEN** 这些连续静止的左右边带不参与垂直位移投票，正文位移不得因此被低估并产生重复内容
 
 ### Requirement: Dynamic-width canvas alignment
 

@@ -13,3 +13,14 @@ import Testing
     #expect(policy.boundary(mode: .manual, elapsed: 900, currentHeight: 2000, proposedAdditionalHeight: 0, stationaryProbes: 4) == .suspectedEnd)
 }
 
+@Test func stationaryFramesCannotMeanEndBeforeTheFirstRealMovement() {
+    let policy = SessionPolicy()
+    #expect(policy.boundary(
+        mode: .automatic,
+        elapsed: 5,
+        currentHeight: 1200,
+        proposedAdditionalHeight: 0,
+        stationaryProbes: 100,
+        hasObservedMovement: false
+    ) == .none)
+}
