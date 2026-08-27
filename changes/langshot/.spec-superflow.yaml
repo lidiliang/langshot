@@ -1,0 +1,48 @@
+# .spec-superflow.yaml — lightweight state machine
+# Derived data. Always rebuildable from artifacts. Lost/corrupt → fall back to content-level detection.
+
+# === Core state ===
+state: executing
+workflow: full
+revision: 1
+
+# === Hashes (fast staleness detection) ===
+artifacts_hash: sha256:1031f6e63c1ba691b7d6e70cc8704a1127a7d8dd4e12570ae32a5c6d03fb67e4
+contract_hash: sha256:8eac1b07171bc20c9f539cff5a5face7ae596bdded4a4cc716f45974044a7e67
+
+# === Execution progress ===
+execution_mode: sdd
+execution_plan_hash: sha256:f5b0ed629a105abcfa688ffb2de643031563a6990ba26947b9c5e5fe1571d3da
+execution_plan_revision: 1
+batches_completed: 0
+test_result: null
+spec_merged: false
+spec_publication_receipt: null
+
+# === Metadata ===
+change_name: langshot
+last_transition: 2026-08-27T05:56:19.104Z
+last_transition_from: approved-for-build
+last_transition_to: executing
+
+# === Decision points ===
+dp_0_decisions: change_name=langshot; intent=开发名为 langShot 的 macOS uTools 高清滚动长截图插件；workflow_path=full（与推荐一致，因新模块、IPC/权限、跨模块与高不确定性）；artifact_language=中文；constraints=需求澄清基线全部纳入，分核心 MVP 与完整 v1，纯本地、Universal Binary、macOS 10.15+、60000px、单屏；related_optimizations=保持已确认范围，不加入云存储、跨屏、横向或采集中标注；communication=draft_for_review
+dp_0_result: confirmed
+dp_0_confirmed: true
+dp_0_timestamp: 2026-08-27T04:13:04Z
+dp_1_result: confirmed: langShot 为 macOS uTools 长截图插件，采用 uTools+Swift helper；含手动/自动单向纵向滚动、Retina 捕获、动态/锁定选区规则、智能拼接和固定区去重、60000px/10分钟保护、分阶段 MVP 与完整 v1、Universal Binary、单屏边界、完整输出编辑与明确验收矩阵
+dp_1_timestamp: 2026-08-27T04:12:39Z
+dp_2_result: approved: 用户批准需求澄清基线、proposal、五组规格、技术设计与18项分阶段任务
+dp_2_timestamp: 2026-08-27T05:51:40Z
+dp_3_result: approved: 用户批准包含33项需求映射、7个串行wave、TDD义务、review gates与回退规则的执行契约
+dp_3_timestamp: 2026-08-27T05:54:22Z
+dp_4_result: sdd: plan revision 1; user-confirmed; 用户明确选择 SDD 执行模式
+dp_4_timestamp: 2026-08-27T05:56:18.844Z
+dp_5_result: null
+dp_5_timestamp: null
+dp_5_decisions: null
+dp_5_confirmed: null
+dp_6_result: null
+dp_6_timestamp: null
+dp_7_result: null
+dp_7_timestamp: null
