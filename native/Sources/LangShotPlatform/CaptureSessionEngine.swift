@@ -24,6 +24,7 @@ public final class CaptureSessionEngine {
     private let anchor: PointValue?
     private let capture = ScreenCaptureService()
     private let matcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 24, confidenceThreshold: 0.68)
+    private let staticDetector = StaticBandDetector()
     private let policy = SessionPolicy()
     private let worker = DispatchQueue(label: "app.langshot.capture", qos: .userInitiated)
     private let progress: ProgressHandler
@@ -37,6 +38,8 @@ public final class CaptureSessionEngine {
     private var startedAt = Date()
     private var captureInFlight = false
     private var scrollTick = 0
+    private var staticTop = 0
+    private var staticBottom = 0
 
     public init(sessionId: String, mode: CaptureMode, requestedDirection: ScrollDirection, selection: RectValue, overlayWindowId: CGWindowID, anchor: PointValue?, progress: @escaping ProgressHandler, completion: @escaping CompletionHandler) {
         self.sessionId = sessionId; self.mode = mode; self.requestedDirection = requestedDirection
@@ -104,7 +107,11 @@ public final class CaptureSessionEngine {
                 return
             }
             guard let previousProbe else { return }
-            let candidates = try [ScrollDirection.down, .up].map { ($0, try matcher.match(previous: previousProbe, current: probe, direction: $0)) }
+            let bands = try staticDetector.unchangedEdgeBands(previous: previousProbe, current: probe, maximumFraction: 0.25)
+            let contentPrevious = try Self.cropProbe(previousProbe, top: bands.top, bottom: bands.bottom)
+            let contentCurrent = try Self.cropProbe(probe, top: bands.top, bottom: bands.bottom)
+            let directions: [ScrollDirection] = mode == .automatic ? [requestedDirection] : [.down, .up]
+            let candidates = try directions.map { ($0, try matcher.match(previous: contentPrevious, current: contentCurrent, direction: $0)) }
             guard let best = candidates.max(by: { $0.1.confidence < $1.1.confidence }), best.1.accepted else {
                 stationaryProbes += 1
                 if records.count > 1, stationaryProbes >= 30 { finish() }
@@ -113,7 +120,11 @@ public final class CaptureSessionEngine {
             if let direction, direction != best.0 { return }
             direction = best.0
             stationaryProbes = 0
-            let additional = policy.acceptedAdditionalHeight(currentHeight: effectiveHeight, proposed: best.1.displacement)
+            let scale = Double(image.height) / Double(probe.height)
+            staticTop = max(staticTop, Int((Double(bands.top) * scale).rounded()))
+            staticBottom = max(staticBottom, Int((Double(bands.bottom) * scale).rounded()))
+            let physicalDisplacement = max(1, Int((Double(best.1.displacement) * scale).rounded()))
+            let additional = policy.acceptedAdditionalHeight(currentHeight: effectiveHeight, proposed: physicalDisplacement)
             guard additional > 0 else { finish(); return }
             let url = try persist(image: image, index: records.count)
             records.append(FrameRecord(url: url, displacement: additional))
@@ -129,8 +140,9 @@ public final class CaptureSessionEngine {
         timer?.invalidate(); timer = nil
         guard !records.isEmpty else { return fail(ScreenCaptureError.captureFailed) }
         let records = self.records, direction = self.direction ?? requestedDirection, sessionId = self.sessionId, completion = self.completion
+        let staticTop = self.staticTop, staticBottom = self.staticBottom
         worker.async {
-            do { let url = try CaptureSessionEngine.compose(records: records, direction: direction, sessionId: sessionId); DispatchQueue.main.async { completion(.success(url)) } }
+            do { let url = try CaptureSessionEngine.compose(records: records, direction: direction, sessionId: sessionId, staticTop: staticTop, staticBottom: staticBottom); DispatchQueue.main.async { completion(.success(url)) } }
             catch { DispatchQueue.main.async { completion(.failure(error)) } }
         }
     }
@@ -147,7 +159,7 @@ public final class CaptureSessionEngine {
         return url
     }
 
-    private nonisolated static func compose(records: [FrameRecord], direction: ScrollDirection, sessionId: String) throws -> URL {
+    private nonisolated static func compose(records: [FrameRecord], direction: ScrollDirection, sessionId: String, staticTop: Int, staticBottom: Int) throws -> URL {
         let ordered = direction == .down ? records : records.reversed()
         let images = try ordered.map { record -> (CGImage, Int) in
             guard let source = CGImageSourceCreateWithURL(record.url as CFURL, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw ScreenCaptureError.captureFailed }
@@ -157,12 +169,22 @@ public final class CaptureSessionEngine {
         let height = min(60_000, images.first!.0.height + images.dropFirst().reduce(0) { $0 + $1.1 })
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw ScreenCaptureError.imageEncodingFailed }
         context.translateBy(x: 0, y: CGFloat(height)); context.scaleBy(x: 1, y: -1)
+        let firstContentHeight = max(1, images[0].0.height - staticBottom)
         var y = 0
-        context.draw(images[0].0, in: CGRect(x: 0, y: 0, width: images[0].0.width, height: images[0].0.height)); y += images[0].0.height
+        if let first = images[0].0.cropping(to: CGRect(x: 0, y: 0, width: images[0].0.width, height: firstContentHeight)) {
+            context.draw(first, in: CGRect(x: 0, y: 0, width: first.width, height: first.height)); y += first.height
+        }
         for (image, displacement) in images.dropFirst() where y < height {
-            let sliceHeight = min(displacement, height - y)
-            guard let slice = image.cropping(to: CGRect(x: 0, y: image.height - sliceHeight, width: image.width, height: sliceHeight)) else { continue }
+            let availableBottom = max(staticTop, image.height - staticBottom)
+            let sliceHeight = min(displacement, min(height - y, max(0, availableBottom - staticTop)))
+            guard sliceHeight > 0, let slice = image.cropping(to: CGRect(x: 0, y: availableBottom - sliceHeight, width: image.width, height: sliceHeight)) else { continue }
             context.draw(slice, in: CGRect(x: 0, y: y, width: slice.width, height: slice.height)); y += sliceHeight
+        }
+        if staticBottom > 0, y < height, let last = images.last?.0 {
+            let footerHeight = min(staticBottom, height - y)
+            if let footer = last.cropping(to: CGRect(x: 0, y: last.height - footerHeight, width: last.width, height: footerHeight)) {
+                context.draw(footer, in: CGRect(x: 0, y: y, width: footer.width, height: footer.height))
+            }
         }
         guard let final = context.makeImage() else { throw ScreenCaptureError.imageEncodingFailed }
         let formatter = DateFormatter(); formatter.dateFormat = "yyyyMMdd-HHmmss"
@@ -192,5 +214,12 @@ public final class CaptureSessionEngine {
         guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { throw ScreenCaptureError.imageEncodingFailed }
         context.interpolationQuality = .low; context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return try GrayFrame(width: width, height: height, pixels: pixels)
+    }
+
+    private nonisolated static func cropProbe(_ frame: GrayFrame, top: Int, bottom: Int) throws -> GrayFrame {
+        let start = min(max(0, top), frame.height - 1)
+        let end = max(start + 1, frame.height - max(0, bottom))
+        let pixels = Array(frame.pixels[(start * frame.width)..<(end * frame.width)])
+        return try GrayFrame(width: frame.width, height: end - start, pixels: pixels)
     }
 }

@@ -47,10 +47,10 @@ public final class SelectionOverlayController: NSObject {
         window.contentView = overlayView
         overlayView.onConfirm = { [weak self] localRect in
             guard let self else { return }
-            let frame = self.display.screen.frame
+            let frame = self.display.geometry.pointBounds
             let global = RectValue(
                 x: frame.minX + localRect.minX,
-                y: frame.maxY - localRect.maxY,
+                y: frame.minY + localRect.minY,
                 width: localRect.width,
                 height: localRect.height
             )
@@ -59,8 +59,8 @@ public final class SelectionOverlayController: NSObject {
         overlayView.onCancel = { [weak self] in self?.onCancel() }
         overlayView.onAnchor = { [weak self] localPoint in
             guard let self else { return }
-            let frame = self.display.screen.frame
-            self.onAnchor?(PointValue(x: frame.minX + localPoint.x, y: frame.maxY - localPoint.y))
+            let frame = self.display.geometry.pointBounds
+            self.onAnchor?(PointValue(x: frame.minX + localPoint.x, y: frame.minY + localPoint.y))
         }
     }
 

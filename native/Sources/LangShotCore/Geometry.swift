@@ -61,7 +61,7 @@ public struct DisplayGeometry: Codable, Equatable, Sendable {
     public func pixelRect(for globalPointRect: RectValue) -> PixelRect? {
         guard let clipped = pointBounds.intersection(globalPointRect) else { return nil }
         let localX = clipped.minX - pointBounds.minX
-        let localTop = pointBounds.maxY - clipped.maxY
+        let localTop = clipped.minY - pointBounds.minY
         return PixelRect(
             x: Int((localX * scaleX).rounded()),
             y: Int((localTop * scaleY).rounded()),
@@ -70,4 +70,3 @@ public struct DisplayGeometry: Codable, Equatable, Sendable {
         )
     }
 }
-

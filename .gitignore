@@ -3,7 +3,8 @@ node_modules/
 dist/
 build/
 native/.build/
+native/.build-arm64/
+native/.build-x86_64/
 *.xcresult
 *.log
 .langshot-sessions/
-
