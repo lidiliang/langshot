@@ -1,0 +1,24 @@
+native/Sources/LangShotPlatform/SelectionOverlay.swift
+  d7380fe541df2300 21,42,90-91,98,101-124,136-145,151,153-160,167-168,192,206-208,237-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "3fd79c9b5fff4a3ef819584e61764728a67589b0",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 134,
+      "total_deletions": 7,
+      "accepted_lines": 133,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/db141916ec960cd1702a77a2a727494b3d6c80fad4dbf47a519d09e2b4c2cdab"
+    }
+  }
+}
