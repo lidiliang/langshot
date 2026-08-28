@@ -1,0 +1,34 @@
+plugin/lib/preview-layout.js
+  d7380fe541df2300 1-26
+tests/js/preview-layout.test.js
+  d7380fe541df2300 1-33
+plugin/app.js
+  d7380fe541df2300 22-24,32,44,216-217,327-336,341-349,766,789
+plugin/styles.css
+  d7380fe541df2300 90-94
+tests/js/manifest.test.js
+  d7380fe541df2300 86-98
+plugin/index.html
+  d7380fe541df2300 61-65,104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b8ff0ffe1bd79122ed46910b8e55778b0c17f407",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 111,
+      "total_deletions": 4,
+      "accepted_lines": 132,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/52c53ee9f2e28b58e4ca602b17fe13e3bd5d3f3a246b624e88080d624a53894b"
+    }
+  }
+}
