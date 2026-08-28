@@ -1,0 +1,24 @@
+tests/js/manifest.test.js
+  d7380fe541df2300 25,27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6b6b0197069e18c541d0a6c19f98473b73625e61",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 6,
+      "accepted_lines": 23,
+      "overriden_lines": 2,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/e320cf9689986ec10946f4d7e3aae35e3e5dcaf8cdf62ad9a25d3b838bfcfc61"
+    }
+  }
+}
