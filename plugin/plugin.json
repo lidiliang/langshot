@@ -12,7 +12,7 @@
     {
       "code": "langshot.capture",
       "explain": "开始截图",
-      "cmds": ["长截屏", "滚动截屏", "滚动截图", "langShot"]
+      "cmds": ["截图", "长截图", "长截屏", "滚动截图", "langShot"]
     }
   ]
 }

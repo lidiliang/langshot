@@ -22,8 +22,9 @@ test('uTools commands remain unique after case-insensitive normalization', () =>
   const commands = manifest.features.flatMap(feature => feature.cmds || [])
   const normalized = commands.map(command => String(command).trim().toLocaleLowerCase('en-US'))
   assert.equal(manifest.pluginName, '滚动长截图')
+  assert.ok(commands.length <= 5, 'uTools recommends at most five commands per feature')
   assert.equal(new Set(normalized).size, normalized.length)
-  assert.deepEqual(commands, ['长截屏', '滚动截屏', '滚动截图', 'langShot'])
+  assert.deepEqual(commands, ['截图', '长截图', '长截屏', '滚动截图', 'langShot'])
 })
 
 test('release metadata is synchronized for version 1.0.0', () => {
