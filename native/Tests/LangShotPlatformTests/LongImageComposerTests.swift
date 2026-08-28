@@ -98,6 +98,15 @@ import LangShotCore
     ) == .scroll)
 }
 
+@Test func automaticModeSuppressesUserScrollingButAllowsItsOwnMarkedEvents() {
+    #expect(ScrollInputBlocker.shouldSuppress(type: .scrollWheel, sourceUserData: 0))
+    #expect(!ScrollInputBlocker.shouldSuppress(
+        type: .scrollWheel,
+        sourceUserData: ScrollInputBlocker.syntheticEventMarker
+    ))
+    #expect(!ScrollInputBlocker.shouldSuppress(type: .keyDown, sourceUserData: 0))
+}
+
 @Test func displacementHistoryCanRecoverAWeakButConsistentMatch() {
     let consistent = OverlapResult(displacement: 21, overlap: 79, confidence: 0.62, accepted: false)
     let jump = OverlapResult(displacement: 55, overlap: 45, confidence: 0.62, accepted: false)
@@ -122,7 +131,36 @@ import LangShotCore
     ))
 }
 
-@Test func bootstrapWeakMatchAndRecoveryNudgePreventAnInitialStall() {
+@Test func strongPixelAlignmentAndMotionHistoryRecoverAnAmbiguousMatch() {
+    let guided = OverlapResult(
+        displacement: 20,
+        overlap: 80,
+        confidence: 0.55,
+        accepted: false,
+        alignmentDifference: 2
+    )
+    let visuallyDifferent = OverlapResult(
+        displacement: 20,
+        overlap: 80,
+        confidence: 0.55,
+        accepted: false,
+        alignmentDifference: 24
+    )
+    #expect(CaptureSessionEngine.predictedMatchIsAcceptable(
+        result: guided,
+        recentDisplacements: [19, 20, 20, 21],
+        unchangedDifference: 12,
+        probeHeight: 100
+    ))
+    #expect(!CaptureSessionEngine.predictedMatchIsAcceptable(
+        result: visuallyDifferent,
+        recentDisplacements: [19, 20, 20, 21],
+        unchangedDifference: 12,
+        probeHeight: 100
+    ))
+}
+
+@Test func bootstrapWeakMatchAndStrictRecoveryProtectContinuity() {
     let smallBootstrap = OverlapResult(displacement: 18, overlap: 82, confidence: 0.61, accepted: false)
     let unsafeJump = OverlapResult(displacement: 40, overlap: 60, confidence: 0.61, accepted: false)
     #expect(CaptureSessionEngine.predictedMatchIsAcceptable(
@@ -137,9 +175,17 @@ import LangShotCore
         unchangedDifference: 12,
         probeHeight: 100
     ))
-    #expect(!CaptureSessionEngine.shouldNudgeAutomaticRecovery(consecutiveFailures: 5, recoveryNudges: 0))
-    #expect(CaptureSessionEngine.shouldNudgeAutomaticRecovery(consecutiveFailures: 6, recoveryNudges: 0))
-    #expect(!CaptureSessionEngine.shouldNudgeAutomaticRecovery(consecutiveFailures: 12, recoveryNudges: 6))
+    #expect(CaptureSessionEngine.automaticRecoveryRetryDelay(consecutiveFailures: 1) == 0.20)
+    #expect(CaptureSessionEngine.automaticRecoveryRetryDelay(consecutiveFailures: 100) == 0.5)
+    #expect(!CaptureSessionEngine.automaticRecoveryIsExhausted(consecutiveFailures: 14))
+    #expect(CaptureSessionEngine.automaticRecoveryIsExhausted(consecutiveFailures: 15))
+    #expect(CaptureSessionEngine.automaticRecoveryIsExhausted(consecutiveFailures: 16))
+    #expect(CaptureSessionEngine.automaticTickAction(
+        captureInFlight: false,
+        awaitingSample: true,
+        retryingMatch: true,
+        settleDelayElapsed: true
+    ) == .sample)
 }
 
 @Test func stationaryEndDetectionNeverFinishesWithoutUserConfirmation() {

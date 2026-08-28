@@ -22,6 +22,8 @@ public struct CaptureResult: Sendable {
 
 public enum CaptureEngineStatus: Sendable {
     case running
+    case matchingUncertain(attempt: Int, limit: Int)
+    case matchingRecoveryExhausted(attempts: Int)
     case paused
     case finishing
 }
@@ -39,6 +41,8 @@ enum AutomaticTickAction: Equatable {
 
 @MainActor
 public final class CaptureSessionEngine {
+    nonisolated static let automaticRecoveryAttemptLimit = 15
+
     public typealias ProgressHandler = @MainActor (CaptureProgress) -> Void
     public typealias CompletionHandler = @MainActor (Result<CaptureResult, Error>) -> Void
     public typealias StatusHandler = @MainActor (CaptureEngineStatus) -> Void
@@ -55,6 +59,7 @@ public final class CaptureSessionEngine {
     private let automaticMatcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 24, minimumOverlapFraction: 0.35, confidenceThreshold: 0.68)
     private let manualMatcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 12, minimumOverlapFraction: 0.12, confidenceThreshold: 0.72)
     private let staticDetector = StaticBandDetector()
+    private let scrollInputBlocker = ScrollInputBlocker()
     private let policy = SessionPolicy()
     private let worker = DispatchQueue(label: "app.langshot.capture", qos: .userInitiated)
     private let progress: ProgressHandler
@@ -72,7 +77,6 @@ public final class CaptureSessionEngine {
     private var automaticSampleNotBefore = Date.distantPast
     private var automaticStepLines: Int32 = 2
     private var automaticHighConfidenceStreak = 0
-    private var automaticRecoveryNudges = 0
     private var acceptedProbeDisplacements: [Int] = []
     private var staticTop = 0
     private var staticBottom = 0
@@ -91,6 +95,10 @@ public final class CaptureSessionEngine {
 
     public func start() {
         startedAt = Date()
+        if mode == .automatic, !scrollInputBlocker.start() {
+            fail(ScreenCaptureError.inputProtectionUnavailable)
+            return
+        }
         status(.running)
         sample()
         if mode != .simple { scheduleSamplingTimer() }
@@ -100,6 +108,7 @@ public final class CaptureSessionEngine {
         guard !isCancelled else { return }
         isCancelled = true
         invalidateTimers()
+        scrollInputBlocker.stop()
         try? FileManager.default.removeItem(at: Self.sessionDirectory(sessionId))
     }
 
@@ -187,7 +196,17 @@ public final class CaptureSessionEngine {
             let matchingCurrent = try Self.cropProbe(contentCurrent, left: sides.left, right: sides.right)
             let matcher = mode == .automatic ? automaticMatcher : manualMatcher
             let directions: [ScrollDirection] = mode == .automatic ? [requestedDirection] : [.down, .up]
-            let candidates = try directions.map { ($0, try matcher.match(previous: matchingPrevious, current: matchingCurrent, direction: $0)) }
+            let preferredDisplacement = mode == .automatic ? Self.medianDisplacement(acceptedProbeDisplacements) : nil
+            let preferenceTolerance = preferredDisplacement.map { max(3, Int((Double($0) * 0.4).rounded(.up))) } ?? 0
+            let candidates = try directions.map {
+                ($0, try matcher.match(
+                    previous: matchingPrevious,
+                    current: matchingCurrent,
+                    direction: $0,
+                    preferredDisplacement: preferredDisplacement,
+                    preferenceTolerance: preferenceTolerance
+                ))
+            }
             guard let best = candidates.max(by: { $0.1.confidence < $1.1.confidence }) else { throw MatchError.invalidFrame }
             let unchangedDifference = try matcher.differenceWithoutMovement(previous: matchingPrevious, current: matchingCurrent)
             let acceptedByPrediction = Self.predictedMatchIsAcceptable(
@@ -223,8 +242,8 @@ public final class CaptureSessionEngine {
             direction = best.0
             hasObservedMovement = true
             stationaryProbes = 0
+            let recoveredFromUncertainMatch = consecutiveMatchFailures > 0
             consecutiveMatchFailures = 0
-            automaticRecoveryNudges = 0
             resampleBeforeNextScroll = false
             awaitingAutomaticSample = false
             acceptedProbeDisplacements.append(best.1.displacement)
@@ -247,6 +266,7 @@ public final class CaptureSessionEngine {
             records.append(FrameRecord(url: url, displacement: additional))
             effectiveHeight += additional
             self.previousProbe = probe
+            if recoveredFromUncertainMatch { status(.running) }
             progress(CaptureProgress(height: effectiveHeight, frames: records.count, confidence: best.1.confidence))
             let boundary = policy.boundary(mode: mode, elapsed: Date().timeIntervalSince(startedAt), currentHeight: effectiveHeight, proposedAdditionalHeight: 0, stationaryProbes: 0)
             if Self.shouldFinishAutomatically(at: boundary) { finish() }
@@ -257,6 +277,7 @@ public final class CaptureSessionEngine {
         guard !isCancelled, !isFinishing else { return }
         isFinishing = true
         invalidateTimers()
+        scrollInputBlocker.stop()
         status(.finishing)
         guard !records.isEmpty else { return fail(ScreenCaptureError.captureFailed) }
         let records = self.records, direction = self.direction ?? requestedDirection, completion = self.completion
@@ -278,6 +299,7 @@ public final class CaptureSessionEngine {
     private func fail(_ error: Error) {
         guard !isCancelled else { return }
         invalidateTimers()
+        scrollInputBlocker.stop()
         completion(.failure(error))
     }
 
@@ -296,19 +318,18 @@ public final class CaptureSessionEngine {
             if mode == .automatic {
                 automaticStepLines = 1
                 automaticHighConfidenceStreak = 0
-                if Self.shouldNudgeAutomaticRecovery(
-                    consecutiveFailures: consecutiveMatchFailures,
-                    recoveryNudges: automaticRecoveryNudges
-                ) {
-                    automaticRecoveryNudges += 1
-                    awaitingAutomaticSample = false
-                    resampleBeforeNextScroll = false
-                    automaticSampleNotBefore = .distantPast
-                } else {
-                    awaitingAutomaticSample = true
-                    resampleBeforeNextScroll = true
-                    automaticSampleNotBefore = Date().addingTimeInterval(0.12)
+                if Self.automaticRecoveryIsExhausted(consecutiveFailures: consecutiveMatchFailures) {
+                    invalidateTimers()
+                    status(.matchingRecoveryExhausted(attempts: consecutiveMatchFailures))
+                    return
                 }
+                awaitingAutomaticSample = true
+                resampleBeforeNextScroll = true
+                automaticSampleNotBefore = Date().addingTimeInterval(Self.automaticRecoveryRetryDelay(consecutiveFailures: consecutiveMatchFailures))
+                status(.matchingUncertain(
+                    attempt: consecutiveMatchFailures,
+                    limit: Self.automaticRecoveryAttemptLimit
+                ))
             }
             return
         }
@@ -335,11 +356,12 @@ public final class CaptureSessionEngine {
         return .scroll
     }
 
-    nonisolated static func shouldNudgeAutomaticRecovery(
-        consecutiveFailures: Int,
-        recoveryNudges: Int
-    ) -> Bool {
-        consecutiveFailures > 0 && consecutiveFailures % 6 == 0 && recoveryNudges < 6
+    nonisolated static func automaticRecoveryRetryDelay(consecutiveFailures: Int) -> TimeInterval {
+        min(0.5, 0.16 + (Double(max(1, min(consecutiveFailures, 9))) * 0.04))
+    }
+
+    nonisolated static func automaticRecoveryIsExhausted(consecutiveFailures: Int) -> Bool {
+        consecutiveFailures >= automaticRecoveryAttemptLimit
     }
 
     nonisolated static func predictedMatchIsAcceptable(
@@ -348,17 +370,21 @@ public final class CaptureSessionEngine {
         unchangedDifference: Double,
         probeHeight: Int
     ) -> Bool {
-        guard !result.accepted,
-              result.confidence >= 0.58,
-              unchangedDifference > 6 else { return false }
+        guard !result.accepted, unchangedDifference > 6 else { return false }
         guard !recentDisplacements.isEmpty else {
             let maximumBootstrapDisplacement = max(6, probeHeight / 4)
-            return result.displacement <= maximumBootstrapDisplacement
+            return result.confidence >= 0.58 && result.displacement <= maximumBootstrapDisplacement
         }
-        let ordered = recentDisplacements.sorted()
-        let expected = ordered[ordered.count / 2]
+        guard result.confidence >= 0.58 || result.alignmentDifference <= 8 else { return false }
+        guard let expected = medianDisplacement(recentDisplacements) else { return false }
         let tolerance = max(3, Int((Double(expected) * 0.65).rounded(.up)))
         return abs(result.displacement - expected) <= tolerance
+    }
+
+    nonisolated static func medianDisplacement(_ displacements: [Int]) -> Int? {
+        guard !displacements.isEmpty else { return nil }
+        let ordered = displacements.sorted()
+        return ordered[ordered.count / 2]
     }
 
     nonisolated static func shouldFinishAutomatically(at boundary: SessionBoundary) -> Bool {
@@ -479,6 +505,7 @@ public final class CaptureSessionEngine {
         let delta: Int32 = direction == .down ? -magnitude : magnitude
         guard let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: delta, wheel2: 0, wheel3: 0) else { return }
         event.location = CGPoint(x: point.x, y: point.y)
+        event.setIntegerValueField(.eventSourceUserData, value: ScrollInputBlocker.syntheticEventMarker)
         event.post(tap: .cghidEventTap)
     }
 

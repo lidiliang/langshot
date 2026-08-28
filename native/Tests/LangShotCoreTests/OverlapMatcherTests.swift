@@ -74,6 +74,27 @@ import Testing
     #expect(result.confidence < 0.72)
 }
 
+@Test func motionHistoryDisambiguatesPeriodicContentWithoutOverridingImageEvidence() throws {
+    var source: [UInt8] = []
+    for row in 0..<28 {
+        for column in 0..<8 {
+            source.append(UInt8(((row % 4) * 47 + column * 5) % 251))
+        }
+    }
+    let previous = try GrayFrame(width: 8, height: 20, pixels: Array(source[0..<(20 * 8)]))
+    let current = try GrayFrame(width: 8, height: 20, pixels: Array(source[(8 * 8)..<(28 * 8)]))
+    let result = try OverlapMatcher(minimumOverlap: 4).match(
+        previous: previous,
+        current: current,
+        direction: .down,
+        preferredDisplacement: 8,
+        preferenceTolerance: 2
+    )
+    #expect(result.displacement == 8)
+    #expect(result.alignmentDifference == 0)
+    #expect(!result.accepted)
+}
+
 @Test func stationaryDifferenceSeparatesChangedContentFromNoMovement() throws {
     let first = try GrayFrame(width: 2, height: 3, pixels: [10, 10, 20, 20, 30, 30])
     let same = try GrayFrame(width: 2, height: 3, pixels: [10, 10, 20, 20, 30, 30])

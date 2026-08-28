@@ -35,7 +35,7 @@
 #### Scenario: Repetitive rows create several exact matches
 
 - **WHEN** 周期性列表、表格或代码行使多个不同位移都得到相同或近似的最佳分数
-- **THEN** 系统判定结果存在歧义且拒绝该帧，不得因为单个候选的绝对相似度较高而接受它，也不得要求用户点击继续
+- **THEN** 若没有稳定的历史位移，系统判定结果存在歧义并拒绝该帧；若最近多帧位移稳定，系统优先选择历史预测范围内且像素误差接近全局最优值的候选，不得仅凭绝对相似度接受明显偏离历史运动的候选，也不得要求用户点击继续
 
 #### Scenario: Captured frames are composed vertically
 

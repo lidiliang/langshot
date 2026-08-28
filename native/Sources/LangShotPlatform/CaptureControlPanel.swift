@@ -32,13 +32,19 @@ public final class CaptureControlPanelController: NSObject {
         window.orderFrontRegardless()
     }
 
-    public func update(status: String, paused: Bool, finishing: Bool = false) {
+    public func update(status: String, paused: Bool, finishing: Bool = false, recoveryExhausted: Bool = false) {
         statusLabel.stringValue = status
         toggleButton.title = paused ? "继续" : "暂停"
-        toggleButton.isEnabled = !finishing
+        toggleButton.isEnabled = !finishing && !recoveryExhausted
         finishButton.isEnabled = !finishing
         cancelButton.isEnabled = !finishing
-        shortcutLabel.stringValue = finishing ? "正在生成图片，请稍候…" : (paused ? "Space 继续 · Enter 完成 · Esc 取消" : "Esc 暂停 · Enter 完成")
+        if finishing {
+            shortcutLabel.stringValue = "正在生成图片，请稍候…"
+        } else if recoveryExhausted {
+            shortcutLabel.stringValue = "Esc 取消 · Enter 保留当前已确认部分"
+        } else {
+            shortcutLabel.stringValue = paused ? "Space 继续 · Enter 完成 · Esc 取消" : "Esc 暂停 · Enter 完成"
+        }
     }
 
     public func close() { window.orderOut(nil) }

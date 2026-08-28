@@ -171,10 +171,10 @@ public final class SelectionOverlayController: NSObject {
         captureControls?.show()
     }
 
-    public func updateStatus(_ status: String, paused: Bool = false, finishing: Bool = false) {
+    public func updateStatus(_ status: String, paused: Bool = false, finishing: Bool = false, recoveryExhausted: Bool = false) {
         overlayView.status = status
         overlayView.needsDisplay = true
-        captureControls?.update(status: status, paused: paused, finishing: finishing)
+        captureControls?.update(status: status, paused: paused, finishing: finishing, recoveryExhausted: recoveryExhausted)
     }
 
     private func installSelectionKeyMonitors() {

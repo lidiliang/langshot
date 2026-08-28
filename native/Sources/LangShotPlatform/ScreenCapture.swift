@@ -2,7 +2,21 @@ import AppKit
 import CoreGraphics
 import LangShotCore
 
-public enum ScreenCaptureError: Error { case invalidSelection, captureFailed, imageEncodingFailed }
+public enum ScreenCaptureError: LocalizedError {
+    case invalidSelection
+    case captureFailed
+    case imageEncodingFailed
+    case inputProtectionUnavailable
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidSelection: return "截图区域无效"
+        case .captureFailed: return "屏幕截图失败"
+        case .imageEncodingFailed: return "图片编码失败"
+        case .inputProtectionUnavailable: return "无法锁定滚动输入，请确认已授予辅助功能权限后重试"
+        }
+    }
+}
 
 public struct ScreenCaptureService: Sendable {
     public init() {}
@@ -15,4 +29,3 @@ public struct ScreenCaptureService: Sendable {
         return image
     }
 }
-

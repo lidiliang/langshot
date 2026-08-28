@@ -99,7 +99,7 @@
 
 ### Requirement: Non-blocking recognition recovery and limits
 
-系统 MUST 支持到底、高度上限和自动滚动时长上限三类结束保护。无位移或匹配置信度不足属于内部识别状态，MUST NOT 自动进入暂停、显示“点击继续”或要求用户介入；只有用户主动暂停才可把控制卡切换为“继续”。
+系统 MUST 支持到底、高度上限和自动滚动时长上限三类结束保护。无位移或匹配置信度不足属于内部识别状态，MUST NOT 要求用户点击继续；只有用户主动暂停才可把控制卡切换为“继续”。自动模式匹配不稳定时 MUST 暂缓滚动并在控制卡明确说明系统正在自动重试，避免用户误认为插件卡死。
 
 #### Scenario: No effective movement remains
 
@@ -114,7 +114,17 @@
 #### Scenario: Frame matching is temporarily uncertain
 
 - **WHEN** 当前画面相对上一有效帧发生变化，但重叠匹配置信度不足
-- **THEN** 系统先在不追加错误内容的前提下原地重采，连续失败时跳过不可靠过渡并重新同步后续帧；采集控制保持运行，完整性提示只允许在截图成功后非阻塞显示
+- **THEN** 自动模式立即停止发送新的滚动事件，在不追加错误内容的前提下原地重采，并显示“识别失败，自动重试 N/15”；系统优先使用最近有效位移引导重复内容的候选匹配，只有当前画面成功匹配并入库后才恢复滚动，绝不强制跳过不可靠画面；用户仍可随时主动完成或取消
+
+#### Scenario: Automatic matching exhausts its retry budget
+
+- **WHEN** 同一段画面连续 15 次未能可靠匹配
+- **THEN** 系统停止采样和自动滚动，显示“已失败 15 次，建议取消并重新开始”，禁用没有意义的暂停/继续按钮，并保留 `Esc` 取消重开和 `Enter` 导出当前已确认部分两种明确选择
+
+#### Scenario: User scroll input occurs during automatic capture
+
+- **WHEN** 自动滚动截图已经开始，用户操作鼠标滚轮或触控板滚动手势
+- **THEN** 系统拦截该手动滚动输入，只允许带内部标记的插件滚动事件到达目标应用，避免未确认视口被用户输入改变；完成、取消或失败后立即解除拦截
 
 #### Scenario: Height limit is reached
 

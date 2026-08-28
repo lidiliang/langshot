@@ -18,12 +18,14 @@ public struct OverlapResult: Equatable, Sendable {
     public let overlap: Int
     public let confidence: Double
     public let accepted: Bool
+    public let alignmentDifference: Double
 
-    public init(displacement: Int, overlap: Int, confidence: Double, accepted: Bool) {
+    public init(displacement: Int, overlap: Int, confidence: Double, accepted: Bool, alignmentDifference: Double = 255) {
         self.displacement = displacement
         self.overlap = overlap
         self.confidence = confidence
         self.accepted = accepted
+        self.alignmentDifference = alignmentDifference
     }
 }
 
@@ -42,7 +44,13 @@ public struct OverlapMatcher: Sendable {
         self.confidenceThreshold = confidenceThreshold
     }
 
-    public func match(previous: GrayFrame, current: GrayFrame, direction: ScrollDirection) throws -> OverlapResult {
+    public func match(
+        previous: GrayFrame,
+        current: GrayFrame,
+        direction: ScrollDirection,
+        preferredDisplacement: Int? = nil,
+        preferenceTolerance: Int = 0
+    ) throws -> OverlapResult {
         guard previous.width == current.width, previous.height == current.height else { throw MatchError.incompatibleFrames }
         let requiredOverlap = max(minimumOverlap, Int((Double(previous.height) * minimumOverlapFraction).rounded(.up)))
         let maximum = previous.height - requiredOverlap
@@ -56,7 +64,28 @@ public struct OverlapMatcher: Sendable {
             if abs(lhs.score - rhs.score) < 0.0001 { return lhs.offset < rhs.offset }
             return lhs.score < rhs.score
         }
-        let best = scored[0]
+        let globalBest = scored[0]
+        let best: (offset: Int, score: Double)
+        if let preferredDisplacement {
+            let tolerance = max(1, preferenceTolerance)
+            let preferredBest = scored
+                .filter { abs($0.offset - preferredDisplacement) <= tolerance }
+                .min { lhs, rhs in
+                    if abs(lhs.score - rhs.score) < 0.0001 {
+                        return abs(lhs.offset - preferredDisplacement) < abs(rhs.offset - preferredDisplacement)
+                    }
+                    return lhs.score < rhs.score
+                }
+            // Motion history may disambiguate repeated rows, but it must not
+            // override a visibly better match elsewhere in the frame.
+            if let preferredBest, preferredBest.score <= globalBest.score + 2 {
+                best = preferredBest
+            } else {
+                best = globalBest
+            }
+        } else {
+            best = globalBest
+        }
         let ambiguityRadius = max(2, previous.height / 80)
         let alternative = scored.first { abs($0.offset - best.offset) > ambiguityRadius }
         let second = alternative?.score ?? 255
@@ -67,7 +96,8 @@ public struct OverlapMatcher: Sendable {
             displacement: best.offset,
             overlap: previous.height - best.offset,
             confidence: confidence,
-            accepted: confidence >= confidenceThreshold
+            accepted: confidence >= confidenceThreshold,
+            alignmentDifference: best.score
         )
     }
 

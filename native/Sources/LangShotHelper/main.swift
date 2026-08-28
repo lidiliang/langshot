@@ -23,6 +23,7 @@ final class HelperRuntime {
     private var localKeyMonitor: Any?
     private var globalKeyMonitor: Any?
     private var capturePaused = false
+    private var captureRecoveryExhausted = false
 
     init(writer: ProtocolWriter) {
         self.writer = writer
@@ -155,6 +156,7 @@ final class HelperRuntime {
     @MainActor
     private func startEngine(sessionId: String, mode: CaptureMode, direction: ScrollDirection, selection: RectValue, windowID: CGWindowID, anchor: PointValue?) {
         installKeyMonitor(sessionId: sessionId)
+        captureRecoveryExhausted = false
         let targetPoint = anchor ?? PointValue(
             x: selection.origin.x + selection.size.width / 2,
             y: selection.origin.y + selection.size.height / 2
@@ -214,6 +216,7 @@ final class HelperRuntime {
     private func installKeyMonitor(sessionId: String) {
         removeKeyMonitor()
         capturePaused = false
+        captureRecoveryExhausted = false
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             return self.handleCaptureKey(event, sessionId: sessionId) ? nil : event
@@ -228,10 +231,10 @@ final class HelperRuntime {
         guard !event.isARepeat else { return true }
         switch event.keyCode {
         case 53:
-            if capturePaused { discardSession(sessionId: sessionId) }
+            if capturePaused || captureRecoveryExhausted { discardSession(sessionId: sessionId) }
             else { engine?.pause() }
             return true
-        case 49 where capturePaused:
+        case 49 where capturePaused && !captureRecoveryExhausted:
             engine?.resume()
             return true
         case 36, 76:
@@ -245,6 +248,7 @@ final class HelperRuntime {
     @MainActor
     private func togglePause(sessionId: String) {
         guard activeSessionId == sessionId else { return }
+        guard !captureRecoveryExhausted else { return }
         if capturePaused { engine?.resume() }
         else { engine?.pause() }
     }
@@ -268,15 +272,28 @@ final class HelperRuntime {
         case .running:
             let wasPaused = capturePaused
             capturePaused = false
+            captureRecoveryExhausted = false
             overlay?.updateStatus(mode == .simple ? "正在截图…" : "长截图中… · Esc 暂停 · Enter 完成", paused: false)
             if wasPaused { emit("session.resumed", sessionId: sessionId) }
+        case let .matchingUncertain(attempt, limit):
+            captureRecoveryExhausted = false
+            overlay?.updateStatus("识别失败，自动重试 \(attempt)/\(limit)…", paused: false)
+        case let .matchingRecoveryExhausted(attempts):
+            captureRecoveryExhausted = true
+            overlay?.updateStatus(
+                "已失败 \(attempts) 次，建议取消并重新开始",
+                paused: false,
+                recoveryExhausted: true
+            )
         case .paused:
             let wasPaused = capturePaused
             capturePaused = true
+            captureRecoveryExhausted = false
             overlay?.updateStatus("已暂停", paused: true)
             if !wasPaused { emit("session.paused", sessionId: sessionId, payload: ["reason": .string("user")]) }
         case .finishing:
             capturePaused = true
+            captureRecoveryExhausted = false
             overlay?.updateStatus(mode == .simple ? "正在保存截图…" : "正在生成长图…", paused: true, finishing: true)
         }
     }
