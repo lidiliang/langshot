@@ -49,12 +49,30 @@
         <button class="primary" id="startButton">选择截图区域</button>
       </footer>
       <section class="result-panel" id="resultPanel" hidden>
-        <img id="resultImage" alt="截图预览" />
-        <div class="result-meta"><strong>截图已保存到 ~/langshots/</strong><small id="resultPath"></small></div>
-        <div class="result-actions">
-          <button class="secondary result-button" id="revealButton">在访达中显示</button>
-          <button class="primary compact result-button" id="copyButton" aria-keyshortcuts="Enter">复制图片</button>
-          <span class="result-shortcut">按 Enter 快速复制</span>
+        <header class="result-header">
+          <div class="result-meta"><strong>截图已保存到 ~/langshots/</strong><small id="resultPath"></small></div>
+          <div class="editor-tools" role="toolbar" aria-label="图片标注工具">
+            <button class="editor-tool active" id="selectToolButton" aria-pressed="true">⌖ 选择</button>
+            <button class="editor-tool" id="arrowToolButton" aria-pressed="false">↗ 箭头</button>
+            <button class="editor-tool" id="textToolButton" aria-pressed="false">T 文字</button>
+            <button class="editor-tool" id="undoEditButton" disabled>↶ 撤销</button>
+            <span class="editor-help" id="editorHelp">点击标注可选择并拖动，双击文字可重新编辑</span>
+          </div>
+          <div class="result-actions">
+            <button class="secondary result-button" id="revealButton">在访达中显示</button>
+            <button class="primary compact result-button" id="copyButton" aria-keyshortcuts="Enter">复制图片</button>
+            <span class="result-shortcut">按 Enter 快速复制</span>
+          </div>
+        </header>
+        <div class="editor-workspace" id="editorWorkspace">
+          <div class="editor-stage" id="editorStage">
+            <img id="resultImage" alt="截图预览" draggable="false" />
+            <svg class="annotation-layer" id="annotationLayer" aria-label="图片标注层"></svg>
+            <div class="text-editor" id="textEditor" hidden>
+              <input id="textEditorInput" type="text" maxlength="200" placeholder="输入文字，Enter 确认" />
+              <span>Enter 确认 · Esc 取消</span>
+            </div>
+          </div>
         </div>
       </section>
       <section class="permission-dialog" id="permissionDialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle" hidden>
@@ -77,6 +95,7 @@
       </section>
       <div class="toast" id="toast" role="status" hidden></div>
     </main>
+    <script src="lib/annotation-model.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

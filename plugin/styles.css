@@ -72,13 +72,34 @@ h1 { margin: 12px 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: -1
 .permission-steps { margin: 18px 0 0; padding-left: 22px; color: #d6dfec; font-size: 11px; line-height: 1.75; }
 .permission-note { margin: 13px 0 0; padding: 10px 12px; border-radius: 10px; color: #9fb0c8; background: rgba(255,255,255,.035); font-size: 10px; line-height: 1.55; }
 .permission-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
-.result-panel { position: fixed; inset: 64px 30px 28px; z-index: 5; grid-template-columns: 92px 1fr auto; align-items: center; gap: 14px; padding: 16px; border-radius: 18px; background: rgba(15,24,39,.98); border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(0,0,0,.48); }
+.result-panel { position: fixed; inset: 64px 30px 28px; z-index: 5; grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 14px; border-radius: 18px; background: rgba(15,24,39,.98); border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(0,0,0,.48); }
 .result-panel:not([hidden]) { display: grid; }
-.result-panel img { width: 92px; height: calc(100vh - 128px); max-height: 320px; object-fit: contain; object-position: top; border-radius: 10px; background: rgba(255,255,255,.04); }
-.result-meta { min-width: 0; }
+.result-header { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.result-meta { flex: 1 1 170px; min-width: 0; padding-top: 4px; }
 .result-meta strong, .result-meta small { display: block; }
 .result-meta small { margin-top: 6px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .result-actions { display: grid; grid-template-columns: max-content max-content; align-items: start; column-gap: 10px; row-gap: 6px; }
 .result-button { height: 34px; min-width: 92px; padding-top: 0; padding-bottom: 0; }
 .result-shortcut { grid-column: 2; justify-self: center; color: #8fa5c4; font-size: 10px; white-space: nowrap; }
+.editor-tools { display: grid; grid-template-columns: repeat(4, max-content); align-items: start; column-gap: 6px; row-gap: 5px; }
+.editor-tool { height: 34px; padding: 0 11px; border: 1px solid rgba(128,157,199,.22); border-radius: 9px; color: #b8c8df; background: rgba(255,255,255,.045); cursor: pointer; font-size: 11px; font-weight: 650; }
+.editor-tool:hover:not(:disabled) { border-color: rgba(75,140,255,.55); color: white; }
+.editor-tool.active { border-color: rgba(91,157,255,.86); color: white; background: rgba(75,140,255,.28); box-shadow: 0 0 0 1px rgba(75,140,255,.16); }
+.editor-tool:disabled { opacity: .38; cursor: default; }
+.editor-help { grid-column: 1 / -1; color: #8295b0; font-size: 10px; }
+.editor-workspace { min-height: 0; overflow: auto; padding: 12px; border: 1px solid rgba(148,173,211,.12); border-radius: 13px; background: #070b12; }
+.editor-stage { position: relative; margin: 0 auto; background: rgba(255,255,255,.035); box-shadow: 0 8px 34px rgba(0,0,0,.35); }
+.editor-stage > img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+.annotation-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.annotation-layer.editing { pointer-events: auto; }
+.annotation-layer.select-mode { cursor: default; }
+.annotation-layer.select-mode [data-annotation-id] { cursor: move; }
+.annotation-layer.select-mode [data-handle] { cursor: crosshair; }
+.annotation-layer.arrow-mode { cursor: crosshair; }
+.annotation-layer.text-mode { cursor: text; }
+.text-editor { position: absolute; z-index: 4; width: 210px; padding: 7px; border: 1px solid rgba(75,140,255,.72); border-radius: 9px; background: #111b2d; box-shadow: 0 10px 32px rgba(0,0,0,.45); }
+.text-editor[hidden] { display: none; }
+.text-editor input { width: 100%; padding: 7px 8px; border: 1px solid rgba(148,173,211,.22); border-radius: 6px; outline: 0; color: white; background: #0b1220; font: 13px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+.text-editor input:focus { border-color: rgba(75,140,255,.78); }
+.text-editor span { display: block; margin-top: 5px; color: #8497b2; font-size: 9px; }
 .toast { position: fixed; z-index: 40; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 15px; border: 1px solid rgba(52,211,153,.28); border-radius: 10px; background: #173c35; color: #d8fff2; font-size: 12px; font-weight: 650; box-shadow: 0 8px 30px rgba(0,0,0,.42); }

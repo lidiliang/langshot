@@ -51,10 +51,11 @@ class HelperClient extends EventEmitter {
     this.start()
     const message = createRequest(type, payload)
     return new Promise((resolve, reject) => {
+      const timeoutMs = type === 'editor.export' ? Math.max(this.timeoutMs, 30000) : this.timeoutMs
       const timer = setTimeout(() => {
         this.pending.delete(message.requestId)
         reject(new Error(`Helper request timed out: ${type}`))
-      }, this.timeoutMs)
+      }, timeoutMs)
       this.pending.set(message.requestId, { resolve, reject, timer })
       this.process.stdin.write(`${JSON.stringify(message)}\n`)
     })

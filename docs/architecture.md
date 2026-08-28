@@ -198,7 +198,7 @@ helper 是会话状态的唯一权威。状态转换表在 Swift 中以纯 reduc
 
 **Choice**
 
-TypeScript 编辑器保存矢量操作列表、马赛克区域和 crop rect，使用 viewport canvas 组合预览；导出时把版本化 edit document 发送给 helper。helper 以 CoreGraphics 按输出条带读取原始 tiles、重放标注和马赛克并编码。PNG/JPEG 使用 ImageIO；WebP 优先运行时 ImageIO 支持，否则使用体积受控的 bundled libwebp 编码器。
+Web 编辑器保存矢量操作列表、马赛克区域和 crop rect，使用 viewport 图层组合预览；导出时把版本化 edit document 发送给 helper。首批已实现的箭头和文字使用 SVG 预览层，并以原图左上角像素坐标发送 `editor.export`。每个预览对象有本地稳定 ID，选择工具提供整体平移、箭头端点调整和文字二次编辑；历史栈保存变更前快照用于撤销。helper 使用 CoreGraphics/CoreText 重放标注并以 ImageIO 生成新的 PNG，不覆盖原始截图。后续完整编辑器再扩展马赛克、裁剪、JPEG 与 WebP；WebP 优先运行时 ImageIO 支持，否则使用体积受控的 bundled libwebp 编码器。
 
 **Rationale**
 
@@ -212,7 +212,7 @@ Web UI 适合高频编辑交互，native 流式渲染能绕过浏览器大画布
 
 **Consequences**
 
-Web 与 Swift 必须共享编辑文档 schema 和黄金图测试；WebP fallback 必须通过 20MB 包体门禁，不能满足时需回到产品决策而非静默取消格式。
+Web 与 Swift 必须共享编辑文档 schema 和黄金图测试；helper 只接受 `~/langshots/` 中由 langShot 命名的非符号链接 PNG，并限制单次标注数量。WebP fallback 必须通过 20MB 包体门禁，不能满足时需回到产品决策而非静默取消格式。
 
 ### D9. 开发、Universal 与签名分层
 

@@ -71,3 +71,15 @@ test('the completed result exposes Enter as the copy shortcut', () => {
   assert.match(html, /aria-keyshortcuts="Enter"/)
   assert.match(html, /按 Enter 快速复制/)
 })
+
+test('the result editor exposes arrow and text annotation tools', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
+  const html = fs.readFileSync(path.join(projectRoot, 'plugin', 'index.html'), 'utf8')
+
+  assert.match(html, /id="selectToolButton"[\s\S]*⌖ 选择/)
+  assert.match(html, /id="arrowToolButton"[\s\S]*↗ 箭头/)
+  assert.match(html, /id="textToolButton"[\s\S]*T 文字/)
+  assert.match(html, /双击文字可重新编辑/)
+  assert.match(app, /request\('editor\.export'/)
+})

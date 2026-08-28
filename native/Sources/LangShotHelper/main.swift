@@ -58,11 +58,35 @@ final class HelperRuntime {
             case "session.discard":
                 discardSession(sessionId: activeSessionId)
                 respond(request, [:])
+            case "editor.export":
+                exportEditedImage(request)
             default:
                 writer.write(ResponseEnvelope(requestId: request.requestId, error: ProtocolFailure(code: "UNIMPLEMENTED", message: "Request is not implemented yet: \(request.type)")))
             }
         } catch {
             writer.write(ResponseEnvelope(requestId: request.requestId, error: ProtocolFailure(code: "INVALID_REQUEST", message: "Malformed or incompatible request")))
+        }
+    }
+
+    @MainActor
+    private func exportEditedImage(_ request: RequestEnvelope) {
+        guard case let .string(sourcePath)? = request.payload["sourcePath"],
+              let annotationValue = request.payload["annotations"] else {
+            writer.write(ResponseEnvelope(
+                requestId: request.requestId,
+                error: ProtocolFailure(code: "INVALID_EDITOR_REQUEST", message: "缺少待编辑图片或标注数据")
+            ))
+            return
+        }
+        do {
+            let annotations = try AnnotationRenderer.parse(annotationValue)
+            let output = try AnnotationRenderer.export(sourcePath: sourcePath, annotations: annotations)
+            respond(request, ["path": .string(output.path)])
+        } catch {
+            writer.write(ResponseEnvelope(
+                requestId: request.requestId,
+                error: ProtocolFailure(code: "EDITOR_EXPORT_FAILED", message: error.localizedDescription)
+            ))
         }
     }
 
