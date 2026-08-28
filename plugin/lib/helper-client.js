@@ -14,6 +14,7 @@ const helperInfoRelativePath = path.join('Contents', 'Info.plist')
 class HelperClient extends EventEmitter {
   constructor(options = {}) {
     super()
+    this.fixedHelperPath = Boolean(options.helperPath)
     this.helperPath = options.helperPath || null
     this.helperPathResolver = options.helperPathResolver || (() => resolveHelperPath({ installRoot: options.helperInstallRoot }))
     this.spawnProcess = options.spawnProcess || spawn
@@ -25,7 +26,11 @@ class HelperClient extends EventEmitter {
 
   start() {
     if (this.process) return
-    if (!this.helperPath) this.helperPath = this.helperPathResolver()
+    // uTools can keep the renderer (and this client instance) alive while a
+    // newer plugin bundle is installed. Resolve dynamic paths again on every
+    // process start so the helper digest tracks the currently loaded bundle
+    // instead of indefinitely restarting an older materialized executable.
+    if (!this.fixedHelperPath) this.helperPath = this.helperPathResolver()
     if (!fs.existsSync(this.helperPath)) {
       throw new Error(`langShot helper not found: ${this.helperPath}`)
     }

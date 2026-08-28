@@ -45,6 +45,28 @@ test('a late exit from the previous helper cannot disconnect a reopened plugin',
   assert.deepEqual(await secondResponse, { reopened: true })
 })
 
+test('a reopened plugin resolves the current bundled helper again', async () => {
+  const first = fakeChild()
+  const second = fakeChild()
+  const children = [first, second]
+  const resolvedPaths = [__filename, path.join(__dirname, '..', '..', 'package.json')]
+  const spawnedPaths = []
+  const client = new HelperClient({
+    helperPathResolver: () => resolvedPaths.shift(),
+    spawnProcess: helperPath => {
+      spawnedPaths.push(helperPath)
+      return children.shift()
+    },
+    timeoutMs: 100
+  })
+
+  client.start()
+  client.stop()
+  client.start()
+
+  assert.deepEqual(spawnedPaths, [__filename, path.join(__dirname, '..', '..', 'package.json')])
+})
+
 test('a bundled helper is materialized to a real executable app bundle', t => {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'langshot-helper-test-'))
   t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }))
