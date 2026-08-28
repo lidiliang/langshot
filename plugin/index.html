@@ -58,6 +58,11 @@
             <button class="editor-tool" id="undoEditButton" disabled>↶ 撤销</button>
             <span class="editor-help" id="editorHelp">点击标注可选择并拖动，双击文字可重新编辑</span>
           </div>
+          <div class="preview-controls" role="group" aria-label="预览缩放">
+            <button class="preview-button active" id="actualPixelsButton" aria-pressed="true">原始像素</button>
+            <button class="preview-button" id="fitWidthButton" aria-pressed="false">适应宽度</button>
+            <span class="preview-scale" id="previewScale">100%</span>
+          </div>
           <div class="result-actions">
             <button class="secondary result-button" id="revealButton">在访达中显示</button>
             <button class="primary compact result-button" id="copyButton" aria-keyshortcuts="Enter">复制图片</button>
@@ -96,6 +101,7 @@
       <div class="toast" id="toast" role="status" hidden></div>
     </main>
     <script src="lib/annotation-model.js"></script>
+    <script src="lib/preview-layout.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

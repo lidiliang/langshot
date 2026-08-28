@@ -87,6 +87,11 @@ h1 { margin: 12px 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: -1
 .editor-tool.active { border-color: rgba(91,157,255,.86); color: white; background: rgba(75,140,255,.28); box-shadow: 0 0 0 1px rgba(75,140,255,.16); }
 .editor-tool:disabled { opacity: .38; cursor: default; }
 .editor-help { grid-column: 1 / -1; color: #8295b0; font-size: 10px; }
+.preview-controls { display: grid; grid-template-columns: max-content max-content max-content; align-items: center; gap: 6px; }
+.preview-button { height: 30px; padding: 0 10px; border: 1px solid rgba(128,157,199,.22); border-radius: 8px; color: #aebed5; background: rgba(255,255,255,.04); cursor: pointer; font-size: 10px; font-weight: 650; }
+.preview-button:hover { border-color: rgba(75,140,255,.5); color: white; }
+.preview-button.active { border-color: rgba(91,157,255,.8); color: white; background: rgba(75,140,255,.24); }
+.preview-scale { min-width: 38px; color: #8fa5c4; font-size: 10px; text-align: center; }
 .editor-workspace { min-height: 0; overflow: auto; padding: 12px; border: 1px solid rgba(148,173,211,.12); border-radius: 13px; background: #070b12; }
 .editor-stage { position: relative; margin: 0 auto; background: rgba(255,255,255,.035); box-shadow: 0 8px 34px rgba(0,0,0,.35); }
 .editor-stage > img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }

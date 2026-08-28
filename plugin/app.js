@@ -19,6 +19,9 @@ const selectToolButton = document.getElementById('selectToolButton')
 const arrowToolButton = document.getElementById('arrowToolButton')
 const textToolButton = document.getElementById('textToolButton')
 const undoEditButton = document.getElementById('undoEditButton')
+const actualPixelsButton = document.getElementById('actualPixelsButton')
+const fitWidthButton = document.getElementById('fitWidthButton')
+const previewScale = document.getElementById('previewScale')
 const editorHelp = document.getElementById('editorHelp')
 const editorWorkspace = document.getElementById('editorWorkspace')
 const editorStage = document.getElementById('editorStage')
@@ -26,6 +29,7 @@ const annotationLayer = document.getElementById('annotationLayer')
 const textEditor = document.getElementById('textEditor')
 const textEditorInput = document.getElementById('textEditorInput')
 const annotationModel = window.langShotAnnotationModel
+const previewLayoutModel = window.langShotPreviewLayout
 let completedPath = null
 let editorTool = 'select'
 let annotations = []
@@ -37,6 +41,7 @@ let annotationDrag = null
 let annotationHistory = []
 let annotationSequence = 0
 let resultBusy = false
+let previewMode = 'actual'
 
 window.langShot.onPluginEnter(resetForNewEntry)
 
@@ -208,6 +213,8 @@ selectToolButton.addEventListener('click', () => setEditorTool('select'))
 arrowToolButton.addEventListener('click', () => setEditorTool(editorTool === 'arrow' ? 'select' : 'arrow'))
 textToolButton.addEventListener('click', () => setEditorTool(editorTool === 'text' ? 'select' : 'text'))
 undoEditButton.addEventListener('click', undoLastAnnotation)
+actualPixelsButton.addEventListener('click', () => setPreviewMode('actual'))
+fitWidthButton.addEventListener('click', () => setPreviewMode('fit'))
 resultImage.addEventListener('load', layoutEditorImage)
 window.addEventListener('resize', () => {
   if (!resultPanel.hidden) layoutEditorImage()
@@ -317,12 +324,27 @@ function setEditorTool(tool) {
 function layoutEditorImage() {
   if (!resultImage.naturalWidth || !resultImage.naturalHeight || resultPanel.hidden) return
   const availableWidth = Math.max(220, editorWorkspace.clientWidth - 24)
-  const displayWidth = Math.min(resultImage.naturalWidth, availableWidth)
-  const displayHeight = Math.max(1, resultImage.naturalHeight * displayWidth / resultImage.naturalWidth)
-  editorStage.style.width = `${displayWidth}px`
-  editorStage.style.height = `${displayHeight}px`
+  const layout = previewLayoutModel.calculatePreviewLayout({
+    naturalWidth: resultImage.naturalWidth,
+    naturalHeight: resultImage.naturalHeight,
+    availableWidth,
+    devicePixelRatio: window.devicePixelRatio,
+    mode: previewMode
+  })
+  editorStage.style.width = `${layout.displayWidth}px`
+  editorStage.style.height = `${layout.displayHeight}px`
+  previewScale.textContent = `${layout.percentage}%`
   annotationLayer.setAttribute('viewBox', `0 0 ${resultImage.naturalWidth} ${resultImage.naturalHeight}`)
   renderAnnotations()
+}
+
+function setPreviewMode(mode) {
+  previewMode = mode === 'fit' ? 'fit' : 'actual'
+  actualPixelsButton.classList.toggle('active', previewMode === 'actual')
+  fitWidthButton.classList.toggle('active', previewMode === 'fit')
+  actualPixelsButton.setAttribute('aria-pressed', String(previewMode === 'actual'))
+  fitWidthButton.setAttribute('aria-pressed', String(previewMode === 'fit'))
+  layoutEditorImage()
 }
 
 function editorPoint(event) {
@@ -741,6 +763,7 @@ async function beginCapture() {
 
 function showResult(filePath, warnings = []) {
   completedPath = filePath
+  setPreviewMode('actual')
   resetAnnotationEditor()
   setResultBusy(false)
   resultPath.textContent = filePath || '已保存到 ~/langshots/'
@@ -763,6 +786,7 @@ function resetForNewEntry() {
   clearTimeout(copyButton.resetTimer)
   clearTimeout(showToast.timer)
   completedPath = null
+  previewMode = 'actual'
   resetAnnotationEditor()
   state.mode = 'simple'
   state.direction = 'down'

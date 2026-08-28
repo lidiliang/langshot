@@ -83,3 +83,16 @@ test('the result editor exposes arrow and text annotation tools', () => {
   assert.match(html, /双击文字可重新编辑/)
   assert.match(app, /request\('editor\.export'/)
 })
+
+test('the result preview defaults to Retina-aware original pixels and can fit width', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
+  const html = fs.readFileSync(path.join(projectRoot, 'plugin', 'index.html'), 'utf8')
+
+  assert.match(html, /id="actualPixelsButton"[\s\S]*原始像素/)
+  assert.match(html, /id="fitWidthButton"[\s\S]*适应宽度/)
+  assert.match(html, /id="previewScale"[\s\S]*100%/)
+  assert.match(app, /let previewMode = 'actual'/)
+  assert.match(app, /devicePixelRatio: window\.devicePixelRatio/)
+  assert.match(app, /previewLayoutModel\.calculatePreviewLayout/)
+})
