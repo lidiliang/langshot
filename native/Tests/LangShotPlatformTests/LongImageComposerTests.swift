@@ -4,6 +4,12 @@ import Testing
 import LangShotCore
 @testable import LangShotPlatform
 
+@Test func simpleCaptureFinishesImmediatelyAfterItsFirstFrame() {
+    #expect(CaptureSessionEngine.shouldFinishAfterFirstFrame(mode: .simple))
+    #expect(!CaptureSessionEngine.shouldFinishAfterFirstFrame(mode: .manual))
+    #expect(!CaptureSessionEngine.shouldFinishAfterFirstFrame(mode: .automatic))
+}
+
 @Test func longImageCompositionPreservesVerticalPixelOrientation() throws {
     let source = try makeStripedImage()
     let result = try CaptureSessionEngine.renderLongImage(images: [(source, source.height)], staticTop: 0, staticBottom: 0)

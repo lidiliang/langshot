@@ -4,7 +4,7 @@ import LangShotCore
 
 @MainActor
 public final class SelectionOverlayController: NSObject {
-    public typealias Confirmation = (NativeDisplay, RectValue, CGWindowID) -> Void
+    public typealias Confirmation = (NativeDisplay, RectValue, CGWindowID, CaptureMode, ScrollDirection) -> Void
 
     private let display: NativeDisplay
     private let window: NSPanel
@@ -21,8 +21,9 @@ public final class SelectionOverlayController: NSObject {
     private var localKeyMonitor: Any?
     private var globalKeyMonitor: Any?
     private var isActive = false
+    private var selectionFrameOnScreen: NSRect?
 
-    public init(display: NativeDisplay, onConfirm: @escaping Confirmation, onCancel: @escaping () -> Void) {
+    public init(display: NativeDisplay, preferredMode: CaptureMode = .simple, preferredDirection: ScrollDirection = .down, onConfirm: @escaping Confirmation, onCancel: @escaping () -> Void) {
         self.display = display
         self.onConfirm = onConfirm
         self.onCancel = onCancel
@@ -33,7 +34,11 @@ public final class SelectionOverlayController: NSObject {
             defer: false,
             screen: display.screen
         )
-        overlayView = SelectionOverlayView(frame: NSRect(origin: .zero, size: display.screen.frame.size))
+        overlayView = SelectionOverlayView(
+            frame: NSRect(origin: .zero, size: display.screen.frame.size),
+            preferredMode: preferredMode,
+            preferredDirection: preferredDirection
+        )
         super.init()
         configureWindow()
     }
@@ -64,7 +69,7 @@ public final class SelectionOverlayController: NSObject {
         window.acceptsMouseMovedEvents = true
         window.ignoresMouseEvents = false
         window.contentView = overlayView
-        overlayView.onConfirm = { [weak self] localRect in
+        overlayView.onConfirm = { [weak self] localRect, mode, direction in
             guard let self else { return }
             let frame = self.display.geometry.pointBounds
             let global = RectValue(
@@ -73,7 +78,14 @@ public final class SelectionOverlayController: NSObject {
                 width: localRect.width,
                 height: localRect.height
             )
-            self.onConfirm(self.display, global, CGWindowID(self.window.windowNumber))
+            let screenFrame = self.display.screen.frame
+            self.selectionFrameOnScreen = NSRect(
+                x: screenFrame.minX + localRect.minX,
+                y: screenFrame.maxY - localRect.maxY,
+                width: localRect.width,
+                height: localRect.height
+            )
+            self.onConfirm(self.display, global, CGWindowID(self.window.windowNumber), mode, direction)
         }
         overlayView.onCancel = { [weak self] in self?.cancelSelection() }
         overlayView.onHover = { [weak self] point in self?.resolveCandidate(at: point) }
@@ -122,21 +134,28 @@ public final class SelectionOverlayController: NSObject {
 
     public func requestAnchor(_ callback: @escaping (PointValue) -> Void) {
         onAnchor = callback
+        overlayView.hideSelectionToolbar()
         overlayView.phase = .anchor
         overlayView.needsDisplay = true
     }
 
-    public func beginCapturing(status: String, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    public func beginCapturing(mode: CaptureMode, status: String, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
         removeSelectionKeyMonitors()
         window.styleMask = [.borderless, .nonactivatingPanel]
         window.resignKey()
         overlayView.phase = .capturing
+        overlayView.hideSelectionToolbar()
         overlayView.status = status
         overlayView.needsDisplay = true
         window.hidesOnDeactivate = false
         window.ignoresMouseEvents = true
+        if mode == .simple {
+            window.orderFrontRegardless()
+            return
+        }
         captureControls = CaptureControlPanelController(
             screen: display.screen,
+            selectionFrame: selectionFrameOnScreen ?? display.screen.visibleFrame,
             onTogglePause: onTogglePause,
             onFinish: onFinish,
             onCancel: onCancel
@@ -161,13 +180,23 @@ public final class SelectionOverlayController: NSObject {
     private func installSelectionKeyMonitors() {
         removeSelectionKeyMonitors()
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53, event.isARepeat == false else { return event }
-            self?.cancelSelection()
-            return nil
+            self?.handleSelectionKey(event) == true ? nil : event
         }
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53, event.isARepeat == false else { return }
-            self?.cancelSelection()
+            _ = self?.handleSelectionKey(event)
+        }
+    }
+
+    private func handleSelectionKey(_ event: NSEvent) -> Bool {
+        guard event.isARepeat == false else { return false }
+        switch event.keyCode {
+        case 36, 76:
+            return overlayView.confirmCurrentSelection()
+        case 53:
+            cancelSelection()
+            return true
+        default:
+            return false
         }
     }
 
@@ -189,7 +218,7 @@ private final class SelectionOverlayView: NSView {
     enum Phase { case selecting, anchor, capturing }
     private enum Handle { case topLeft, top, topRight, left, right, bottomLeft, bottom, bottomRight }
     private enum DragMode { case drawing, moving(NSRect), resizing(Handle, NSRect) }
-    var onConfirm: ((NSRect) -> Void)?
+    var onConfirm: ((NSRect, CaptureMode, ScrollDirection) -> Void)?
     var onCancel: (() -> Void)?
     var onAnchor: ((NSPoint) -> Void)?
     var onHover: ((NSPoint) -> Void)?
@@ -201,26 +230,40 @@ private final class SelectionOverlayView: NSView {
     private var hoverCandidate: NSRect?
     private var hoverSource: SelectionCandidate.Source?
     private var clickCandidate: NSRect?
+    private var selectedMode: CaptureMode
+    private var selectedDirection: ScrollDirection
     private let minimumSize: CGFloat = 24
     private let toolbar = NSStackView()
-    private let confirmButton = NSButton(title: "确认选区", target: nil, action: nil)
+    private let simpleModeButton = NSButton(title: "立即截图", target: nil, action: nil)
+    private let automaticModeButton = NSButton(title: "自动滚动截图", target: nil, action: nil)
+    private let manualModeButton = NSButton(title: "手动滚动截图", target: nil, action: nil)
+    private let downButton = NSButton(title: "向下", target: nil, action: nil)
+    private let upButton = NSButton(title: "向上", target: nil, action: nil)
     private let resetButton = NSButton(title: "重新框选", target: nil, action: nil)
     private let cancelButton = NSButton(title: "取消", target: nil, action: nil)
 
-    override init(frame frameRect: NSRect) {
+    init(frame frameRect: NSRect, preferredMode: CaptureMode, preferredDirection: ScrollDirection) {
+        selectedMode = preferredMode
+        selectedDirection = preferredDirection
         super.init(frame: frameRect)
         toolbar.orientation = .horizontal
-        toolbar.spacing = 8
+        toolbar.alignment = .centerY
+        toolbar.spacing = 6
         toolbar.edgeInsets = NSEdgeInsets(top: 7, left: 8, bottom: 7, right: 8)
         toolbar.wantsLayer = true
         toolbar.layer?.backgroundColor = NSColor(calibratedWhite: 0.06, alpha: 0.94).cgColor
         toolbar.layer?.cornerRadius = 10
-        configureButton(confirmButton, action: #selector(confirmSelection), primary: true)
+        configureChoiceButton(simpleModeButton, action: #selector(startSimpleCapture), minimumWidth: 72)
+        configureChoiceButton(automaticModeButton, action: #selector(startAutomaticCapture), minimumWidth: 96)
+        configureChoiceButton(manualModeButton, action: #selector(startManualCapture), minimumWidth: 96)
+        configureChoiceButton(downButton, action: #selector(selectDownDirection), minimumWidth: 44)
+        configureChoiceButton(upButton, action: #selector(selectUpDirection), minimumWidth: 44)
         configureButton(resetButton, action: #selector(resetSelection), primary: false)
         configureButton(cancelButton, action: #selector(cancelSelection), primary: false)
-        toolbar.addArrangedSubview(confirmButton)
-        toolbar.addArrangedSubview(resetButton)
-        toolbar.addArrangedSubview(cancelButton)
+        for button in [simpleModeButton, automaticModeButton, manualModeButton, downButton, upButton, resetButton, cancelButton] {
+            toolbar.addArrangedSubview(button)
+        }
+        refreshButtonStyles()
         toolbar.isHidden = true
         addSubview(toolbar)
     }
@@ -299,11 +342,7 @@ private final class SelectionOverlayView: NSView {
         dragStart = nil
         dragMode = nil
         clickCandidate = nil
-        if shouldAutoConfirm, let selection {
-            toolbar.isHidden = true
-            onConfirm?(selection)
-            return
-        }
+        if shouldAutoConfirm { hoverCandidate = nil; hoverSource = nil }
         updateToolbar()
         needsDisplay = true
     }
@@ -315,7 +354,7 @@ private final class SelectionOverlayView: NSView {
         }
         switch event.keyCode {
         case 36, 76:
-            if let selection, selection.width >= minimumSize, selection.height >= minimumSize { onConfirm?(selection) }
+            confirmSelection()
         case 53:
             onCancel?()
         case 123, 124, 125, 126:
@@ -323,6 +362,15 @@ private final class SelectionOverlayView: NSView {
         default:
             super.keyDown(with: event)
         }
+    }
+
+    func confirmCurrentSelection() -> Bool {
+        guard phase == .selecting,
+              let selection,
+              selection.width >= minimumSize,
+              selection.height >= minimumSize else { return false }
+        confirmSelection()
+        return true
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -352,8 +400,8 @@ private final class SelectionOverlayView: NSView {
                 let kind = hoverSource == .accessibilityElement ? "元素" : "窗口"
                 drawHint("已推荐\(kind) · 单击锁定 · 拖拽自由框选")
             }
-        case .anchor: drawHint("点击选区内需要滚动的位置")
-        case .capturing: drawHint(status.isEmpty ? "长截图中…" : status)
+        case .anchor: drawHint("点击选区内需要滚动的位置", near: visibleRect)
+        case .capturing: break
         }
     }
 
@@ -367,14 +415,22 @@ private final class SelectionOverlayView: NSView {
         for point in points { NSBezierPath(ovalIn: NSRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)).fill() }
     }
 
-    private func drawHint(_ text: String) {
+    private func drawHint(_ text: String, near selection: NSRect? = nil) {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 13, weight: .medium),
             .foregroundColor: NSColor.white,
             .backgroundColor: NSColor(calibratedWhite: 0.05, alpha: 0.82)
         ]
         let size = text.size(withAttributes: attributes)
-        let rect = NSRect(x: bounds.midX - size.width / 2 - 10, y: 24, width: size.width + 20, height: size.height + 10)
+        let width = size.width + 20
+        let height = size.height + 10
+        let x = selection.map { min(max(10, $0.midX - width / 2), bounds.maxX - width - 10) } ?? (bounds.midX - width / 2)
+        var y: CGFloat = 24
+        if let selection {
+            y = selection.minY - height - 10
+            if y < 10 { y = min(bounds.maxY - height - 10, selection.maxY + 10) }
+        }
+        let rect = NSRect(x: x, y: y, width: width, height: height)
         NSColor(calibratedWhite: 0.05, alpha: 0.82).setFill()
         NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8).fill()
         text.draw(at: NSPoint(x: rect.minX + 10, y: rect.minY + 5), withAttributes: attributes)
@@ -390,10 +446,52 @@ private final class SelectionOverlayView: NSView {
     private func configureButton(_ button: NSButton, action: Selector, primary: Bool) {
         button.target = self
         button.action = action
-        button.bezelStyle = .rounded
+        button.isBordered = false
         button.controlSize = .regular
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 7
+        button.layer?.borderWidth = 1
+        button.layer?.backgroundColor = (primary
+            ? NSColor(calibratedRed: 0.20, green: 0.48, blue: 0.98, alpha: 1)
+            : NSColor(calibratedRed: 0.12, green: 0.16, blue: 0.24, alpha: 1)).cgColor
+        button.layer?.borderColor = (primary
+            ? NSColor(calibratedRed: 0.38, green: 0.65, blue: 1, alpha: 1)
+            : NSColor(calibratedRed: 0.30, green: 0.38, blue: 0.52, alpha: 0.72)).cgColor
+        button.contentTintColor = primary ? .white : NSColor(calibratedRed: 0.82, green: 0.87, blue: 0.96, alpha: 1)
         button.font = NSFont.systemFont(ofSize: 12, weight: primary ? .semibold : .regular)
-        if primary { button.contentTintColor = NSColor(calibratedRed: 0.24, green: 0.55, blue: 1, alpha: 1) }
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
+    }
+
+    private func configureChoiceButton(_ button: NSButton, action: Selector, minimumWidth: CGFloat) {
+        button.target = self
+        button.action = action
+        button.isBordered = false
+        button.controlSize = .regular
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 7
+        button.layer?.borderWidth = 1
+        button.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        button.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        button.widthAnchor.constraint(greaterThanOrEqualToConstant: minimumWidth).isActive = true
+    }
+
+    private func refreshButtonStyles() {
+        styleChoiceButton(simpleModeButton, selected: selectedMode == .simple)
+        styleChoiceButton(automaticModeButton, selected: selectedMode == .automatic)
+        styleChoiceButton(manualModeButton, selected: selectedMode == .manual)
+        styleChoiceButton(downButton, selected: selectedDirection == .down)
+        styleChoiceButton(upButton, selected: selectedDirection == .up)
+    }
+
+    private func styleChoiceButton(_ button: NSButton, selected: Bool) {
+        button.layer?.backgroundColor = (selected
+            ? NSColor(calibratedRed: 0.18, green: 0.47, blue: 0.98, alpha: 1)
+            : NSColor(calibratedRed: 0.10, green: 0.15, blue: 0.24, alpha: 1)).cgColor
+        button.layer?.borderColor = (selected
+            ? NSColor(calibratedRed: 0.48, green: 0.72, blue: 1, alpha: 1)
+            : NSColor(calibratedRed: 0.27, green: 0.36, blue: 0.50, alpha: 0.72)).cgColor
+        button.contentTintColor = selected ? .white : NSColor(calibratedRed: 0.72, green: 0.80, blue: 0.92, alpha: 1)
+        button.font = NSFont.systemFont(ofSize: 12, weight: selected ? .semibold : .medium)
     }
 
     private func updateToolbar() {
@@ -402,6 +500,7 @@ private final class SelectionOverlayView: NSView {
             return
         }
         toolbar.isHidden = false
+        refreshButtonStyles()
         toolbar.layoutSubtreeIfNeeded()
         let size = toolbar.fittingSize
         let x = min(max(10, selection.maxX - size.width), bounds.maxX - size.width - 10)
@@ -413,8 +512,28 @@ private final class SelectionOverlayView: NSView {
     @objc private func confirmSelection() {
         guard let selection, selection.width >= minimumSize, selection.height >= minimumSize else { return }
         toolbar.isHidden = true
-        onConfirm?(selection)
+        onConfirm?(selection, selectedMode, selectedDirection)
     }
+
+    @objc private func startSimpleCapture() { startCapture(mode: .simple) }
+    @objc private func startAutomaticCapture() { startCapture(mode: .automatic) }
+    @objc private func startManualCapture() { startCapture(mode: .manual) }
+
+    private func startCapture(mode: CaptureMode) {
+        selectedMode = mode
+        refreshButtonStyles()
+        confirmSelection()
+    }
+
+    @objc private func selectDownDirection() { changeDirection(to: .down) }
+    @objc private func selectUpDirection() { changeDirection(to: .up) }
+
+    private func changeDirection(to direction: ScrollDirection) {
+        selectedDirection = direction
+        refreshButtonStyles()
+    }
+
+    func hideSelectionToolbar() { toolbar.isHidden = true }
 
     @objc private func resetSelection() {
         selection = nil

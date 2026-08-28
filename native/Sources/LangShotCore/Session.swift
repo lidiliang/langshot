@@ -1,6 +1,6 @@
 import Foundation
 
-public enum CaptureMode: String, Codable, Sendable { case manual, automatic }
+public enum CaptureMode: String, Codable, Sendable { case simple, manual, automatic }
 public enum ScrollDirection: String, Codable, Sendable { case up, down }
 
 public enum SessionState: String, Codable, CaseIterable, Sendable {
@@ -62,4 +62,3 @@ public struct SessionReducer: Sendable {
         return next
     }
 }
-

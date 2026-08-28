@@ -1,8 +1,9 @@
 'use strict'
 
-const state = { mode: 'automatic', direction: 'down', busy: false }
+const state = { mode: 'simple', direction: 'down', busy: false }
 const modeButtons = Array.from(document.querySelectorAll('.mode-card'))
 const directionButtons = Array.from(document.querySelectorAll('.direction'))
+const directionRow = document.querySelector('.direction-row')
 const startButton = document.getElementById('startButton')
 const permissionDialog = document.getElementById('permissionDialog')
 const permissionItems = document.getElementById('permissionItems')
@@ -34,7 +35,7 @@ const permissionDetails = {
 for (const button of modeButtons) {
   button.addEventListener('click', () => {
     state.mode = button.dataset.mode
-    for (const candidate of modeButtons) candidate.classList.toggle('selected', candidate === button)
+    syncModeUI()
     closePermissionDialog()
   })
 }
@@ -46,7 +47,9 @@ for (const button of directionButtons) {
   })
 }
 
-startButton.addEventListener('click', async () => {
+startButton.addEventListener('click', startCaptureFlow)
+
+async function startCaptureFlow() {
   if (state.busy) return
   setBusy(true)
   try {
@@ -63,7 +66,7 @@ startButton.addEventListener('click', async () => {
   } finally {
     setBusy(false)
   }
-})
+}
 
 permissionItems.addEventListener('click', async event => {
   const button = event.target.closest('[data-permission]')
@@ -111,17 +114,35 @@ retryPermissionButton.addEventListener('click', async () => {
 cancelPermissionButton.addEventListener('click', closePermissionDialog)
 
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !permissionDialog.hidden) closePermissionDialog()
+  if (event.key === 'Escape' && !permissionDialog.hidden) {
+    closePermissionDialog()
+    return
+  }
+  if (event.key === 'Enter' && !event.repeat && resultPanel.hidden === false && permissionDialog.hidden && completedPath && !copyButton.disabled) {
+    event.preventDefault()
+    event.stopPropagation()
+    copyCompletedImage()
+  }
 })
 
 window.langShot.subscribe(event => {
+  if (event.type === 'permission.required') {
+    state.mode = event.payload?.mode || 'automatic'
+    syncModeUI()
+    window.langShot.showMainWindow()
+    showPermissionDialog(event.payload?.permissions || ['accessibility'])
+    return
+  }
   if (event.type === 'session.completed' || event.type === 'session.cancelled' || event.type === 'error') {
     window.langShot.showMainWindow()
   }
   if (event.type === 'session.completed') showResult(event.payload?.path, event.payload?.warnings)
 })
 
-copyButton.addEventListener('click', () => {
+copyButton.addEventListener('click', copyCompletedImage)
+
+function copyCompletedImage() {
+  if (!completedPath || copyButton.disabled) return
   try {
     window.langShot.copyImage(completedPath)
     showToast('图片已成功复制到剪贴板')
@@ -131,7 +152,7 @@ copyButton.addEventListener('click', () => {
     copyButton.resetTimer = setTimeout(() => window.langShot.closePlugin(), 650)
   }
   catch (error) { showToast(error.message) }
-})
+}
 
 revealButton.addEventListener('click', () => completedPath && window.langShot.revealFile(completedPath))
 
@@ -199,6 +220,7 @@ function showResult(filePath, warnings = []) {
   resultPath.textContent = filePath || '已保存到 ~/langshots/'
   resultImage.src = filePath ? `file://${filePath}` : ''
   resultPanel.hidden = false
+  copyButton.focus()
   const warning = captureWarningMessage(warnings)
   if (warning) showToast(warning)
 }
@@ -214,10 +236,10 @@ function resetForNewEntry() {
   clearTimeout(copyButton.resetTimer)
   clearTimeout(showToast.timer)
   completedPath = null
-  state.mode = 'automatic'
+  state.mode = 'simple'
   state.direction = 'down'
   state.busy = false
-  for (const button of modeButtons) button.classList.toggle('selected', button.dataset.mode === state.mode)
+  syncModeUI()
   for (const button of directionButtons) button.classList.toggle('selected', button.dataset.direction === state.direction)
   resultPanel.hidden = true
   resultImage.removeAttribute('src')
@@ -230,6 +252,12 @@ function resetForNewEntry() {
   toast.textContent = ''
   startButton.disabled = false
   startButton.textContent = '选择截图区域'
+  void startCaptureFlow()
+}
+
+function syncModeUI() {
+  for (const button of modeButtons) button.classList.toggle('selected', button.dataset.mode === state.mode)
+  directionRow.hidden = state.mode === 'simple'
 }
 
 function setBusy(value) {

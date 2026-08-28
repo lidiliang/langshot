@@ -12,7 +12,7 @@ public final class CaptureControlPanelController: NSObject {
     private let onFinish: () -> Void
     private let onCancel: () -> Void
 
-    public init(screen: NSScreen, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    public init(screen: NSScreen, selectionFrame: NSRect, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.onTogglePause = onTogglePause
         self.onFinish = onFinish
         self.onCancel = onCancel
@@ -24,7 +24,7 @@ public final class CaptureControlPanelController: NSObject {
             screen: screen
         )
         super.init()
-        configureWindow(on: screen)
+        configureWindow(on: screen, selectionFrame: selectionFrame)
         configureContent()
     }
 
@@ -43,7 +43,7 @@ public final class CaptureControlPanelController: NSObject {
 
     public func close() { window.orderOut(nil) }
 
-    private func configureWindow(on screen: NSScreen) {
+    private func configureWindow(on screen: NSScreen, selectionFrame: NSRect) {
         window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.backgroundColor = NSColor(calibratedWhite: 0.07, alpha: 0.96)
@@ -51,8 +51,27 @@ public final class CaptureControlPanelController: NSObject {
         window.hasShadow = true
         window.hidesOnDeactivate = false
         window.isMovableByWindowBackground = true
-        let visible = screen.visibleFrame
-        window.setFrameOrigin(NSPoint(x: visible.maxX - window.frame.width - 18, y: visible.maxY - window.frame.height - 18))
+        window.setFrame(Self.panelFrame(near: selectionFrame, panelSize: window.frame.size, visibleFrame: screen.visibleFrame), display: false)
+    }
+
+    nonisolated static func panelFrame(near selection: NSRect, panelSize: NSSize, visibleFrame: NSRect) -> NSRect {
+        let margin: CGFloat = 10
+        let minimumX = visibleFrame.minX + margin
+        let maximumX = max(minimumX, visibleFrame.maxX - panelSize.width - margin)
+        let alignedX = min(max(minimumX, selection.maxX - panelSize.width), maximumX)
+        let belowY = selection.minY - panelSize.height - margin
+        let aboveY = selection.maxY + margin
+        let minimumY = visibleFrame.minY + margin
+        let maximumY = max(minimumY, visibleFrame.maxY - panelSize.height - margin)
+        let y: CGFloat
+        if belowY >= minimumY {
+            y = belowY
+        } else if aboveY <= maximumY {
+            y = aboveY
+        } else {
+            y = min(max(minimumY, selection.midY - panelSize.height / 2), maximumY)
+        }
+        return NSRect(origin: NSPoint(x: alignedX, y: y), size: panelSize)
     }
 
     private func configureContent() {

@@ -16,24 +16,29 @@
 
       <section class="hero">
         <div class="eyebrow">原始像素 · 本地处理</div>
-        <h1>一滚，就是一张完整长图。</h1>
-        <p>选择区域后手动滚动，或让 langShot 自动滚动并智能拼接。</p>
+        <h1>框选一次，截图方式由你决定。</h1>
+        <p>打开后直接框选，再选择简单截图、自动滚动或手动滚动；默认使用简单截图。</p>
       </section>
 
       <section class="mode-grid" aria-label="截图模式">
+        <button class="mode-card selected" data-mode="simple">
+          <span class="mode-icon">▣</span>
+          <strong>简单截图</strong>
+          <small>截取当前选区，不滚动不拼接</small>
+        </button>
+        <button class="mode-card recommended" data-mode="automatic">
+          <span class="mode-icon">◎</span>
+          <strong>自动滚动 <span class="recommend-tag">推荐</span></strong>
+          <small>逐步滚动并逐帧校验后再继续，拼接更准确，可减少重叠和遗漏</small>
+        </button>
         <button class="mode-card" data-mode="manual">
           <span class="mode-icon">↕</span>
           <strong>手动滚动</strong>
-          <small>滚动时可继续调整选区</small>
-        </button>
-        <button class="mode-card selected" data-mode="automatic">
-          <span class="mode-icon">◎</span>
-          <strong>自动滚动</strong>
-          <small>指定锚点后自动完成</small>
+          <small>由你控制滚动，适合需要随时停留或调整阅读位置的场景</small>
         </button>
       </section>
 
-      <div class="direction-row" aria-label="滚动方向">
+      <div class="direction-row" aria-label="滚动方向" hidden>
         <span>滚动方向</span>
         <button class="direction selected" data-direction="down">向下</button>
         <button class="direction" data-direction="up">向上</button>
@@ -44,10 +49,13 @@
         <button class="primary" id="startButton">选择截图区域</button>
       </footer>
       <section class="result-panel" id="resultPanel" hidden>
-        <img id="resultImage" alt="长截图预览" />
-        <div class="result-meta"><strong>长截图已保存到 ~/langshots/</strong><small id="resultPath"></small></div>
-        <button class="secondary" id="revealButton">在访达中显示</button>
-        <button class="primary compact" id="copyButton">复制图片</button>
+        <img id="resultImage" alt="截图预览" />
+        <div class="result-meta"><strong>截图已保存到 ~/langshots/</strong><small id="resultPath"></small></div>
+        <div class="result-actions">
+          <button class="secondary result-button" id="revealButton">在访达中显示</button>
+          <button class="primary compact result-button" id="copyButton" aria-keyshortcuts="Enter">复制图片</button>
+          <span class="result-shortcut">按 Enter 快速复制</span>
+        </div>
       </section>
       <section class="permission-dialog" id="permissionDialog" role="dialog" aria-modal="true" aria-labelledby="permissionTitle" hidden>
         <div class="permission-dialog-panel">

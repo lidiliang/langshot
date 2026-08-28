@@ -81,10 +81,19 @@ final class HelperRuntime {
             return
         }
         let sessionId = UUID().uuidString.lowercased()
-        let mode: CaptureMode = request.payload["mode"] == .string("automatic") ? .automatic : .manual
+        let preferredMode: CaptureMode
+        switch request.payload["mode"] {
+        case .string("automatic"): preferredMode = .automatic
+        case .string("manual"): preferredMode = .manual
+        default: preferredMode = .simple
+        }
         let requestedDirection: ScrollDirection = request.payload["direction"] == .string("up") ? .up : .down
         activeSessionId = sessionId
-        overlay = SelectionOverlayController(display: display, onConfirm: { [weak self] display, selection, windowID in
+        overlay = SelectionOverlayController(
+            display: display,
+            preferredMode: preferredMode,
+            preferredDirection: requestedDirection,
+            onConfirm: { [weak self] display, selection, windowID, mode, direction in
             guard let self else { return }
             let pixels = display.geometry.pixelRect(for: selection)
             self.emit("selection.confirmed", sessionId: sessionId, payload: [
@@ -92,18 +101,29 @@ final class HelperRuntime {
                 "x": .number(selection.origin.x), "y": .number(selection.origin.y),
                 "width": .number(selection.size.width), "height": .number(selection.size.height),
                 "pixelWidth": .number(Double(pixels?.width ?? 0)), "pixelHeight": .number(Double(pixels?.height ?? 0)),
-                "overlayWindowId": .number(Double(windowID))
+                "overlayWindowId": .number(Double(windowID)),
+                "mode": .string(mode.rawValue), "direction": .string(direction.rawValue)
             ])
+            if mode == .automatic, !self.permissionService.snapshot().accessibility {
+                self.overlay?.close()
+                self.overlay = nil
+                self.activeSessionId = nil
+                self.emit("permission.required", sessionId: sessionId, payload: [
+                    "mode": .string(mode.rawValue),
+                    "permissions": .array([.string("accessibility")])
+                ])
+                return
+            }
             if mode == .automatic {
                 self.overlay?.requestAnchor { [weak self] anchor in
-                    self?.startEngine(sessionId: sessionId, mode: mode, direction: requestedDirection, selection: selection, windowID: windowID, anchor: anchor)
+                    self?.startEngine(sessionId: sessionId, mode: mode, direction: direction, selection: selection, windowID: windowID, anchor: anchor)
                 }
             } else {
-                self.startEngine(sessionId: sessionId, mode: mode, direction: requestedDirection, selection: selection, windowID: windowID, anchor: nil)
+                self.startEngine(sessionId: sessionId, mode: mode, direction: direction, selection: selection, windowID: windowID, anchor: nil)
             }
-        }, onCancel: { [weak self] in
-            self?.discardSession(sessionId: sessionId)
-        })
+        },
+            onCancel: { [weak self] in self?.discardSession(sessionId: sessionId) }
+        )
         overlay?.show()
         respond(request, ["sessionId": .string(sessionId)])
     }
@@ -126,13 +146,14 @@ final class HelperRuntime {
             targetProcessIdentifier: targetPID,
             progress: { [weak self] progress in
                 guard let self else { return }
-                self.overlay?.updateStatus("长截图中… \(progress.height)px · \(progress.frames) 帧", paused: self.capturePaused)
+                let label = mode == .simple ? "正在截图…" : "长截图中… \(progress.height)px · \(progress.frames) 帧"
+                self.overlay?.updateStatus(label, paused: self.capturePaused)
                 self.emit("session.progress", sessionId: sessionId, payload: [
                     "height": .number(Double(progress.height)), "frames": .number(Double(progress.frames)), "confidence": .number(progress.confidence)
                 ])
             },
             status: { [weak self] status in
-                self?.handleEngineStatus(status, sessionId: sessionId)
+                self?.handleEngineStatus(status, sessionId: sessionId, mode: mode)
             },
             completion: { [weak self] result in
                 guard let self else { return }
@@ -149,7 +170,8 @@ final class HelperRuntime {
             }
         )
         overlay?.beginCapturing(
-            status: "长截图中… 0px · 0 帧",
+            mode: mode,
+            status: mode == .simple ? "正在截图…" : "长截图中… 0px · 0 帧",
             onTogglePause: { [weak self] in self?.togglePause(sessionId: sessionId) },
             onFinish: { [weak self] in self?.finishSession() },
             onCancel: { [weak self] in self?.discardSession(sessionId: sessionId) }
@@ -217,12 +239,12 @@ final class HelperRuntime {
     }
 
     @MainActor
-    private func handleEngineStatus(_ status: CaptureEngineStatus, sessionId: String) {
+    private func handleEngineStatus(_ status: CaptureEngineStatus, sessionId: String, mode: CaptureMode) {
         switch status {
         case .running:
             let wasPaused = capturePaused
             capturePaused = false
-            overlay?.updateStatus("长截图中… · Esc 暂停 · Enter 完成", paused: false)
+            overlay?.updateStatus(mode == .simple ? "正在截图…" : "长截图中… · Esc 暂停 · Enter 完成", paused: false)
             if wasPaused { emit("session.resumed", sessionId: sessionId) }
         case .paused:
             let wasPaused = capturePaused
@@ -231,7 +253,7 @@ final class HelperRuntime {
             if !wasPaused { emit("session.paused", sessionId: sessionId, payload: ["reason": .string("user")]) }
         case .finishing:
             capturePaused = true
-            overlay?.updateStatus("正在生成长图…", paused: true, finishing: true)
+            overlay?.updateStatus(mode == .simple ? "正在保存截图…" : "正在生成长图…", paused: true, finishing: true)
         }
     }
 

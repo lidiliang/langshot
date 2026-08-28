@@ -93,7 +93,7 @@ public final class CaptureSessionEngine {
         startedAt = Date()
         status(.running)
         sample()
-        scheduleSamplingTimer()
+        if mode != .simple { scheduleSamplingTimer() }
     }
 
     public func cancel() {
@@ -175,6 +175,7 @@ public final class CaptureSessionEngine {
                 previousProbe = probe
                 awaitingAutomaticSample = false
                 progress(CaptureProgress(height: effectiveHeight, frames: 1, confidence: 1))
+                if Self.shouldFinishAfterFirstFrame(mode: mode) { finish() }
                 return
             }
             guard let previousProbe else { return }
@@ -362,6 +363,10 @@ public final class CaptureSessionEngine {
 
     nonisolated static func shouldFinishAutomatically(at boundary: SessionBoundary) -> Bool {
         boundary == .heightLimit || boundary == .durationLimit
+    }
+
+    nonisolated static func shouldFinishAfterFirstFrame(mode: CaptureMode) -> Bool {
+        mode == .simple
     }
 
     private func invalidateTimers() {

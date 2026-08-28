@@ -21,3 +21,13 @@ import Testing
         try reducer.reduce(snapshot, action: .resume)
     }
 }
+
+@Test func simpleCaptureUsesTheSameRecoverableSessionLifecycle() throws {
+    let reducer = SessionReducer()
+    var snapshot = SessionSnapshot(state: .selecting, mode: .simple)
+    snapshot = try reducer.reduce(snapshot, action: .selectionConfirmed)
+    snapshot = try reducer.reduce(snapshot, action: .start)
+    snapshot = try reducer.reduce(snapshot, action: .finish)
+    snapshot = try reducer.reduce(snapshot, action: .complete)
+    #expect(snapshot.state == .completed)
+}

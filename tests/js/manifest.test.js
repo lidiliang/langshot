@@ -47,3 +47,27 @@ test('the reused uTools page resets whenever the plugin is entered', () => {
   assert.match(app, /resultPanel\.hidden = true/)
   assert.match(app, /completedPath = null/)
 })
+
+test('capture opens directly in simple screenshot mode', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'plugin', 'plugin.json'), 'utf8'))
+  const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
+  const html = fs.readFileSync(path.join(projectRoot, 'plugin', 'index.html'), 'utf8')
+
+  assert.equal(manifest.features[0].explain, '开始截图')
+  assert.match(app, /const state = \{ mode: 'simple'/)
+  assert.match(app, /function resetForNewEntry\(\)[\s\S]*void startCaptureFlow\(\)/)
+  assert.match(html, /class="mode-card selected" data-mode="simple"/)
+  assert.ok(html.indexOf('data-mode="automatic"') < html.indexOf('data-mode="manual"'))
+  assert.match(html, /自动滚动[\s\S]*推荐[\s\S]*拼接更准确/)
+})
+
+test('the completed result exposes Enter as the copy shortcut', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
+  const html = fs.readFileSync(path.join(projectRoot, 'plugin', 'index.html'), 'utf8')
+
+  assert.match(app, /event\.key === 'Enter'[\s\S]*copyCompletedImage\(\)/)
+  assert.match(html, /aria-keyshortcuts="Enter"/)
+  assert.match(html, /按 Enter 快速复制/)
+})
