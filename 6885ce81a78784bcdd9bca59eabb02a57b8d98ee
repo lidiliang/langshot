@@ -1,0 +1,44 @@
+docs/product/specs/scroll-session.md
+  d7380fe541df2300 102,117-122
+native/Sources/LangShotPlatform/CaptureSessionEngine.swift
+  d7380fe541df2300 25-26,44-45,62,98-101,111,199-209,245,269,280,302,321-324,326-332,359-364
+native/Sources/LangShotPlatform/ScreenCapture.swift
+  d7380fe541df2300 5-19
+native/Sources/LangShotCore/OverlapMatcher.swift
+  d7380fe541df2300 21,23,28,47-53,67-88,99-100
+native/Tests/LangShotCoreTests/OverlapMatcherTests.swift
+  d7380fe541df2300 77-97
+native/Sources/LangShotPlatform/CaptureControlPanel.swift
+  d7380fe541df2300 35,38,41-47
+native/Sources/LangShotPlatform/SelectionOverlay.swift
+  d7380fe541df2300 174,177
+native/Tests/LangShotPlatformTests/LongImageComposerTests.swift
+  d7380fe541df2300 134-163,178-188
+native/Sources/LangShotHelper/main.swift
+  d7380fe541df2300 26,159,219,234,237,251,275,278-287,291,296
+native/Sources/LangShotPlatform/ScrollInputBlocker.swift
+  d7380fe541df2300 1-52
+docs/product/specs/stitching.md
+  d7380fe541df2300 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6885ce81a78784bcdd9bca59eabb02a57b8d98ee",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 237,
+      "total_deletions": 52,
+      "accepted_lines": 246,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/442218b290187f1178a2485ff5360c9bab32a8f74bde307588e49616c3db04ba"
+    }
+  }
+}
