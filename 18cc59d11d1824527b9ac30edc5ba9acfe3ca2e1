@@ -1,0 +1,48 @@
+docs/product/requirements-baseline.md
+  d7380fe541df2300 118-123
+tests/js/manifest.test.js
+  d7380fe541df2300 74-85
+plugin/lib/annotation-model.js
+  d7380fe541df2300 1-24,27-37,73
+docs/architecture.md
+  d7380fe541df2300 201,215
+native/Sources/LangShotHelper/main.swift
+  d7380fe541df2300 61-62,71-89
+native/Tests/LangShotPlatformTests/AnnotationRendererTests.swift
+  d7380fe541df2300 1-110
+native/Sources/LangShotPlatform/AnnotationRenderer.swift
+  d7380fe541df2300 1-155,158-159,162,164-211
+plugin/lib/helper-client.js
+  d7380fe541df2300 54,58
+README.md
+  d7380fe541df2300 16,52-58
+tests/js/annotation-model.test.js
+  d7380fe541df2300 1-43
+plugin/app.js
+  d7380fe541df2300 19-28,31-39,142-152,155,173,175-178,180-181,187-190,193-206,210-216,218-234,236-246,251-253,255-256,266-551,553,556-559,562,564-681,744-745,748-749,766,775
+plugin/styles.css
+  d7380fe541df2300 75,77-78,84-104
+plugin/index.html
+  d7380fe541df2300 52-75,98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "18cc59d11d1824527b9ac30edc5ba9acfe3ca2e1",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 1039,
+      "total_deletions": 63,
+      "accepted_lines": 993,
+      "overriden_lines": 27,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/a56205c08b364e1bd7d23e9c28394673b800d883d6aac9fef60905634bb31890"
+    }
+  }
+}
