@@ -64,6 +64,37 @@ import LangShotCore
     }
 }
 
+@Test func repeatedFloatingOverlayIsReplacedFromTheNextOverlappingFrame() throws {
+    let source = try makeRowGradientImage(width: 4, height: 12)
+    let firstBase = try #require(source.cropping(to: CGRect(x: 0, y: 0, width: 4, height: 8)))
+    let secondBase = try #require(source.cropping(to: CGRect(x: 0, y: 2, width: 4, height: 8)))
+    let thirdBase = try #require(source.cropping(to: CGRect(x: 0, y: 4, width: 4, height: 8)))
+    let overlay = CGRect(x: 1, y: 6, width: 2, height: 1)
+    let first = try addRedOverlay(to: firstBase, topOriginRect: overlay)
+    let second = try addRedOverlay(to: secondBase, topOriginRect: overlay)
+    let third = try addRedOverlay(to: thirdBase, topOriginRect: overlay)
+
+    let result = try CaptureSessionEngine.renderLongImage(
+        images: [(first, first.height), (second, 2), (third, 2)],
+        staticTop: 0,
+        staticBottom: 0,
+        floatingOverlays: [overlay]
+    )
+    let bitmap = NSBitmapImageRep(cgImage: result)
+    var redPixels = 0
+    for y in 0..<result.height {
+        for x in 0..<result.width {
+            let color = try #require(bitmap.colorAt(x: x, y: y))
+            if color.redComponent > 0.9, color.greenComponent < 0.4, color.blueComponent < 0.4 {
+                redPixels += 1
+            }
+        }
+    }
+    // The last frame has no later view of the obscured content, so one real
+    // overlay is preserved instead of inventing pixels. Earlier copies vanish.
+    #expect(redPixels == 2)
+}
+
 @Test func uncertainAutomaticMatchesNeverSkipWhileManualEventuallyResynchronizes() {
     #expect(CaptureSessionEngine.uncertainMatchRecoveryAction(isAutomatic: true, consecutiveFailures: 1) == .retryWithoutScrolling)
     #expect(CaptureSessionEngine.uncertainMatchRecoveryAction(isAutomatic: true, consecutiveFailures: 100) == .retryWithoutScrolling)
@@ -267,23 +298,45 @@ private func makeStripedImage() throws -> CGImage {
     return image
 }
 
-private func makeRowGradientImage(height: Int) throws -> CGImage {
+private func makeRowGradientImage(width: Int = 2, height: Int) throws -> CGImage {
     guard let context = CGContext(
         data: nil,
-        width: 2,
+        width: width,
         height: height,
         bitsPerComponent: 8,
-        bytesPerRow: 8,
+        bytesPerRow: width * 4,
         space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
     ) else { throw TestImageError.context }
     for row in 0..<height {
         let value = CGFloat(row + 1) / CGFloat(height + 1)
         context.setFillColor(red: value, green: value, blue: value, alpha: 1)
-        context.fill(CGRect(x: 0, y: row, width: 2, height: 1))
+        context.fill(CGRect(x: 0, y: row, width: width, height: 1))
     }
     guard let image = context.makeImage() else { throw TestImageError.image }
     return image
+}
+
+private func addRedOverlay(to image: CGImage, topOriginRect: CGRect) throws -> CGImage {
+    guard let context = CGContext(
+        data: nil,
+        width: image.width,
+        height: image.height,
+        bitsPerComponent: 8,
+        bytesPerRow: image.width * 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    ) else { throw TestImageError.context }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    context.setFillColor(NSColor.systemRed.cgColor)
+    context.fill(CGRect(
+        x: topOriginRect.minX,
+        y: CGFloat(image.height) - topOriginRect.maxY,
+        width: topOriginRect.width,
+        height: topOriginRect.height
+    ))
+    guard let result = context.makeImage() else { throw TestImageError.image }
+    return result
 }
 
 private enum TestImageError: Error { case context, image }

@@ -415,7 +415,13 @@ public final class CaptureSessionEngine {
             guard let source = CGImageSourceCreateWithURL(record.url as CFURL, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw ScreenCaptureError.captureFailed }
             return (image, record.displacement)
         }
-        let final = try renderLongImage(images: images, staticTop: staticTop, staticBottom: staticBottom)
+        let floatingOverlays = try detectFloatingOverlays(in: images.map(\.0))
+        let final = try renderLongImage(
+            images: images,
+            staticTop: staticTop,
+            staticBottom: staticBottom,
+            floatingOverlays: floatingOverlays
+        )
         let formatter = DateFormatter(); formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
         let resultDirectory = Self.resultDirectory
         try FileManager.default.createDirectory(at: resultDirectory, withIntermediateDirectories: true)
@@ -464,7 +470,12 @@ public final class CaptureSessionEngine {
         return removed
     }
 
-    nonisolated static func renderLongImage(images: [(CGImage, Int)], staticTop: Int, staticBottom: Int) throws -> CGImage {
+    nonisolated static func renderLongImage(
+        images: [(CGImage, Int)],
+        staticTop: Int,
+        staticBottom: Int,
+        floatingOverlays: [CGRect] = []
+    ) throws -> CGImage {
         guard let firstImage = images.first?.0 else { throw ScreenCaptureError.captureFailed }
         let width = images.map { $0.0.width }.max() ?? 1
         let height = min(60_000, firstImage.height + images.dropFirst().reduce(0) { $0 + $1.1 })
@@ -474,14 +485,56 @@ public final class CaptureSessionEngine {
         if let first = images[0].0.cropping(to: CGRect(x: 0, y: 0, width: images[0].0.width, height: firstContentHeight)) {
             let destinationY = height - top - first.height
             context.draw(first, in: CGRect(x: 0, y: destinationY, width: first.width, height: first.height))
+            if images.count > 1 {
+                let nextImage = images[1].0
+                let nextDisplacement = images[1].1
+                let firstSourceRect = CGRect(x: 0, y: 0, width: first.width, height: first.height)
+                for overlay in floatingOverlays {
+                    let covered = overlay.intersection(firstSourceRect)
+                    guard !covered.isNull, covered.width > 0, covered.height > 0 else { continue }
+                    let replacementRect = covered.offsetBy(dx: 0, dy: -CGFloat(nextDisplacement))
+                    guard replacementRect.minY >= CGFloat(staticTop),
+                          replacementRect.maxY <= CGFloat(nextImage.height - staticBottom),
+                          let replacement = nextImage.cropping(to: replacementRect) else { continue }
+                    let patchY = CGFloat(destinationY) + CGFloat(first.height) - covered.minY - covered.height
+                    context.draw(replacement, in: CGRect(
+                        x: covered.minX,
+                        y: patchY,
+                        width: covered.width,
+                        height: covered.height
+                    ))
+                }
+            }
             top += first.height
         }
-        for (image, displacement) in images.dropFirst() where top < height {
+        for index in 1..<images.count where top < height {
+            let (image, displacement) = images[index]
             let availableBottom = max(staticTop, image.height - staticBottom)
             let sliceHeight = min(displacement, min(height - top, max(0, availableBottom - staticTop)))
-            guard sliceHeight > 0, let slice = image.cropping(to: CGRect(x: 0, y: availableBottom - sliceHeight, width: image.width, height: sliceHeight)) else { continue }
+            let sliceSourceRect = CGRect(x: 0, y: availableBottom - sliceHeight, width: image.width, height: sliceHeight)
+            guard sliceHeight > 0, let slice = image.cropping(to: sliceSourceRect) else { continue }
             let destinationY = height - top - slice.height
             context.draw(slice, in: CGRect(x: 0, y: destinationY, width: slice.width, height: slice.height))
+            if index + 1 < images.count {
+                let nextImage = images[index + 1].0
+                let nextDisplacement = images[index + 1].1
+                for overlay in floatingOverlays {
+                    let covered = overlay.intersection(sliceSourceRect)
+                    guard !covered.isNull, covered.width > 0, covered.height > 0 else { continue }
+                    let replacementRect = covered.offsetBy(dx: 0, dy: -CGFloat(nextDisplacement))
+                    guard replacementRect.minY >= CGFloat(staticTop),
+                          replacementRect.maxY <= CGFloat(nextImage.height - staticBottom),
+                          let replacement = nextImage.cropping(to: replacementRect) else { continue }
+                    let relativeTop = covered.minY - sliceSourceRect.minY
+                    let patchY = CGFloat(destinationY) + CGFloat(slice.height) - relativeTop - covered.height
+                    context.draw(replacement, in: CGRect(
+                        x: covered.minX,
+                        y: patchY,
+                        width: covered.width,
+                        height: covered.height
+                    ))
+                }
+            }
             top += sliceHeight
         }
         if staticBottom > 0, top < height, let last = images.last?.0 {
@@ -493,6 +546,27 @@ public final class CaptureSessionEngine {
         }
         guard let final = context.makeImage() else { throw ScreenCaptureError.imageEncodingFailed }
         return final
+    }
+
+    nonisolated static func detectFloatingOverlays(in images: [CGImage]) throws -> [CGRect] {
+        guard images.count >= 3, let first = images.first else { return [] }
+        let sampleCount = min(9, images.count)
+        let indices = (0..<sampleCount).map { sample -> Int in
+            guard sampleCount > 1 else { return 0 }
+            return Int((Double(sample) * Double(images.count - 1) / Double(sampleCount - 1)).rounded())
+        }
+        let probes = try indices.map { try makeProbe(images[$0], maximumWidth: 320) }
+        let detected = try FloatingOverlayDetector().detect(frames: probes)
+        let scaleX = Double(first.width) / Double(probes[0].width)
+        let scaleY = Double(first.height) / Double(probes[0].height)
+        return detected.map { rect in
+            CGRect(
+                x: Int((Double(rect.x) * scaleX).rounded(.down)),
+                y: Int((Double(rect.y) * scaleY).rounded(.down)),
+                width: Int((Double(rect.width) * scaleX).rounded(.up)),
+                height: Int((Double(rect.height) * scaleY).rounded(.up))
+            )
+        }
     }
 
     private nonisolated static func sessionDirectory(_ sessionId: String) -> URL {
@@ -509,8 +583,8 @@ public final class CaptureSessionEngine {
         event.post(tap: .cghidEventTap)
     }
 
-    private nonisolated static func makeProbe(_ image: CGImage) throws -> GrayFrame {
-        let width = min(256, image.width)
+    private nonisolated static func makeProbe(_ image: CGImage, maximumWidth: Int = 256) throws -> GrayFrame {
+        let width = min(maximumWidth, image.width)
         let height = max(32, Int(Double(image.height) * Double(width) / Double(image.width)))
         var pixels = [UInt8](repeating: 0, count: width * height)
         guard let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { throw ScreenCaptureError.imageEncodingFailed }

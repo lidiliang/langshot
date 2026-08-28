@@ -103,3 +103,36 @@ import Testing
     #expect(try matcher.differenceWithoutMovement(previous: first, current: same) == 0)
     #expect(try matcher.differenceWithoutMovement(previous: first, current: changed) == 30)
 }
+
+@Test func compactScreenFixedControlIsDetectedInsideMovingContent() throws {
+    let width = 24, height = 24
+    let frames = try (0..<5).map { shift -> GrayFrame in
+        var pixels = [UInt8](repeating: 245, count: width * height)
+        for y in 0..<height {
+            for x in 0..<width {
+                pixels[y * width + x] = UInt8((x * 17 + (y + shift * 3) * 29) % 230)
+            }
+        }
+        for point in [(11, 18), (12, 18), (12, 19), (12, 20), (13, 19)] {
+            pixels[point.1 * width + point.0] = 20
+        }
+        return try GrayFrame(width: width, height: height, pixels: pixels)
+    }
+    let overlays = try FloatingOverlayDetector().detect(frames: frames, searchStartFraction: 0.5)
+    let overlay = try #require(overlays.first)
+    #expect(overlay.x <= 11)
+    #expect(overlay.x + overlay.width > 13)
+    #expect(overlay.y <= 18)
+    #expect(overlay.y + overlay.height > 20)
+}
+
+@Test func movingContentWithoutAStableControlDoesNotProduceAnOverlay() throws {
+    let width = 20, height = 20
+    let frames = try (0..<5).map { shift -> GrayFrame in
+        let pixels = (0..<(width * height)).map { index in
+            UInt8((index * 31 + shift * 47) % 251)
+        }
+        return try GrayFrame(width: width, height: height, pixels: pixels)
+    }
+    #expect(try FloatingOverlayDetector().detect(frames: frames).isEmpty)
+}
