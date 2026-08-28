@@ -1,0 +1,54 @@
+plugin/plugin.json
+  d7380fe541df2300 3,14
+README.md
+  d7380fe541df2300 3,7-8,11,16,42-52,75
+tests/js/manifest.test.js
+  d7380fe541df2300 50-73
+docs/product/requirements-baseline.md
+  d7380fe541df2300 6,15,27,36-38,58-59,85-94,120,122
+native/Sources/LangShotHelper/main.swift
+  d7380fe541df2300 84-89,92-96,104-105,107-116,119,122,124-126,149-150,156,173-174,242,247,256
+docs/architecture.md
+  d7380fe541df2300 15,236-248
+native/Sources/LangShotCore/Session.swift
+  d7380fe541df2300 3
+native/Sources/LangShotPlatform/CaptureControlPanel.swift
+  d7380fe541df2300 15,27,46,54-74
+native/Tests/LangShotPlatformTests/LongImageComposerTests.swift
+  d7380fe541df2300 7-12
+native/Sources/LangShotPlatform/CaptureSessionEngine.swift
+  d7380fe541df2300 96,178,368-369
+plugin/app.js
+  d7380fe541df2300 3,6,38,50-52,69,117-125,129-135,142-145,155,223,239,242,255-260
+native/Sources/LangShotPlatform/SelectionOverlay.swift
+  d7380fe541df2300 7,24,26,37-41,72,81-88,137,142,147,152-155,158,183,186-199,221,233-234,237-241,245-247,250-251,256-260,263-266,345,357,367-375,403-404,418,425-433,449,451-460,462-494,503,515-525,528-536
+native/Tests/LangShotCoreTests/SessionTests.swift
+  d7380fe541df2300 24-33
+native/Tests/LangShotPlatformTests/CaptureControlPanelTests.swift
+  d7380fe541df2300 1-31
+plugin/index.html
+  d7380fe541df2300 19-20,24-33,37,41,52-58
+plugin/styles.css
+  d7380fe541df2300 36,43,45-46,49,75,81-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "95d6d4ad5f156f1398de4fc2b15d867d99c86ffc",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 476,
+      "total_deletions": 157,
+      "accepted_lines": 432,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/3958db88bdc1164c94c0e447a9b8a50fe10a59cc2bc767fd370672981ac49239"
+    }
+  }
+}
