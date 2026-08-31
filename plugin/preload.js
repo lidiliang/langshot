@@ -6,6 +6,10 @@ const { clipboard, nativeImage, shell } = require('electron')
 const client = new HelperClient()
 const listeners = new Set()
 
+// Preload runs before the page paints. A fresh renderer is always entering a
+// new capture flow, so hide it here as well as in the re-entry callback below.
+if (globalThis.utools) utools.hideMainWindow()
+
 client.on('event', event => {
   for (const listener of listeners) listener(event)
 })
@@ -24,7 +28,14 @@ window.langShot = Object.freeze({
   },
   onPluginEnter(listener) {
     if (typeof listener !== 'function') throw new TypeError('listener must be a function')
-    if (globalThis.utools) utools.onPluginEnter(listener)
+    if (globalThis.utools) {
+      utools.onPluginEnter(action => {
+        // The native selection overlay is the primary entry surface. Hide the
+        // reused uTools page synchronously so its homepage never flashes first.
+        utools.hideMainWindow()
+        listener(action)
+      })
+    }
     else window.addEventListener('focus', listener)
   },
   hideMainWindow() {

@@ -43,10 +43,21 @@ test('the reused uTools page resets whenever the plugin is entered', () => {
   const pluginRoot = path.resolve(__dirname, '../../plugin')
   const preload = fs.readFileSync(path.join(pluginRoot, 'preload.js'), 'utf8')
   const app = fs.readFileSync(path.join(pluginRoot, 'app.js'), 'utf8')
-  assert.match(preload, /utools\.onPluginEnter\(listener\)/)
+  const initialHide = preload.indexOf('if (globalThis.utools) utools.hideMainWindow()')
+  assert.ok(initialHide >= 0 && initialHide < preload.indexOf('window.langShot ='))
+  assert.match(preload, /utools\.onPluginEnter\(action => \{[\s\S]*utools\.hideMainWindow\(\)[\s\S]*listener\(action\)/)
   assert.match(app, /window\.langShot\.onPluginEnter\(resetForNewEntry\)/)
   assert.match(app, /resultPanel\.hidden = true/)
   assert.match(app, /completedPath = null/)
+})
+
+test('plugin entry hides the homepage before checking permissions', () => {
+  const projectRoot = path.resolve(__dirname, '../..')
+  const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
+
+  assert.match(app, /async function startCaptureFlow\(\) \{[\s\S]*window\.langShot\.hideMainWindow\(\)[\s\S]*request\('permissions\.get'\)/)
+  assert.match(app, /function showPermissionDialog\(missing\) \{[\s\S]*window\.langShot\.showMainWindow\(\)/)
+  assert.match(app, /event\.type === 'session\.completed' \|\| event\.type === 'session\.cancelled' \|\| event\.type === 'error'/)
 })
 
 test('capture opens directly in simple screenshot mode', () => {

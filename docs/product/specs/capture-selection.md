@@ -2,6 +2,20 @@
 
 ## ADDED Requirements
 
+### Requirement: Capture-first plugin entry
+
+系统 MUST 将原生鼠标框选作为搜索结果与快捷键打开插件后的第一交互界面，并 SHALL 在任何异步权限检查前同步隐藏 uTools 插件主窗口，避免首页在框选前出现或闪烁。
+
+#### Scenario: User opens langShot from uTools
+
+- **WHEN** 用户通过搜索结果或快捷键进入 langShot，且屏幕录制权限可用
+- **THEN** 系统直接显示鼠标框选覆盖层，默认使用简单截图，不经过可见的插件首页
+
+#### Scenario: User cancels region selection
+
+- **WHEN** 用户在框选阶段按 `Esc` 或点击取消
+- **THEN** 系统关闭框选覆盖层并显示插件首页，且不生成截图或保留本次临时帧
+
 ### Requirement: Permission-gated capture
 
 系统 MUST 在进入选区前检查屏幕录制权限，并在自动滚动前额外检查辅助功能权限；权限不足时不得启动一个注定失败的会话。

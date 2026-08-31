@@ -77,6 +77,9 @@ startButton.addEventListener('click', startCaptureFlow)
 
 async function startCaptureFlow() {
   if (state.busy) return
+  // Hide before the first asynchronous permission request. The homepage is a
+  // fallback after cancellation, not an intermediate step on every entry.
+  window.langShot.hideMainWindow()
   setBusy(true)
   try {
     const permissions = await window.langShot.request('permissions.get')
@@ -712,6 +715,7 @@ function missingPermissions(permissions) {
 function showPermissionDialog(missing) {
   permissionItems.replaceChildren(...missing.map(createPermissionItem))
   permissionDialog.hidden = false
+  window.langShot.showMainWindow()
   retryPermissionButton.focus()
 }
 

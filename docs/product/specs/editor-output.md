@@ -73,9 +73,9 @@
 
 ### Requirement: Fresh plugin entry state
 
-uTools MAY 复用同一个 Web 页面实例，但 langShot MUST 在每次 `onPluginEnter` 时呈现新的默认首页，并 SHALL 隔离前后两次 helper 进程的退出事件。
+uTools MAY 复用同一个 Web 页面实例，但 langShot MUST 在每次 `onPluginEnter` 时重置状态、同步隐藏主窗口并直接进入新的默认框选流程，并 SHALL 隔离前后两次 helper 进程的退出事件。
 
 #### Scenario: User reopens after copying a result
 
 - **WHEN** 复制成功自动退出后，用户再次通过 uTools 搜索进入 langShot
-- **THEN** 页面恢复自动模式、向下方向和可用的“选择截图区域”按钮，不显示旧图片、旧路径、旧复制状态或旧提示；前一个 helper 的延迟退出不得中断新 helper
+- **THEN** 插件直接进入默认简单截图的鼠标框选，不显示首页、旧图片、旧路径、旧复制状态或旧提示；若用户取消框选，首页显示简单模式、向下方向和可用的“选择截图区域”按钮；前一个 helper 的延迟退出不得中断新 helper
