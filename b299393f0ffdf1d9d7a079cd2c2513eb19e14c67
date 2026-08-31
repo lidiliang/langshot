@@ -1,0 +1,34 @@
+tests/js/manifest.test.js
+  d7380fe541df2300 46-48,54-60
+plugin/app.js
+  d7380fe541df2300 80-82,718
+docs/product/requirements-baseline.md
+  d7380fe541df2300 128
+plugin/preload.js
+  d7380fe541df2300 9-12,31-38
+docs/product/specs/capture-selection.md
+  d7380fe541df2300 5-18
+docs/product/specs/editor-output.md
+  d7380fe541df2300 76,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "b299393f0ffdf1d9d7a079cd2c2513eb19e14c67",
+  "prompts": {
+    "d7380fe541df2300": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04156-483a-7e50-93af-75ce77e423ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "lidiliang <lidiliang@cvte.com>",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 5,
+      "accepted_lines": 66,
+      "overriden_lines": 0,
+      "messages_url": "https://gitai.gz.cvte.cn/cas/0261ac6cb20aa2a36f42bb6393407eebeb545cc8dd4fdbec92781a9f153bc4b7"
+    }
+  }
+}
