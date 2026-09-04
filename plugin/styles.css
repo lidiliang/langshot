@@ -81,7 +81,7 @@ h1 { margin: 12px 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: -1
 .result-actions { display: grid; grid-template-columns: max-content max-content; align-items: start; column-gap: 10px; row-gap: 6px; }
 .result-button { height: 34px; min-width: 92px; padding-top: 0; padding-bottom: 0; }
 .result-shortcut { grid-column: 2; justify-self: center; color: #8fa5c4; font-size: 10px; white-space: nowrap; }
-.editor-tools { display: grid; grid-template-columns: repeat(4, max-content); align-items: start; column-gap: 6px; row-gap: 5px; }
+.editor-tools { display: grid; grid-template-columns: repeat(5, max-content); align-items: start; column-gap: 6px; row-gap: 5px; }
 .editor-tool { height: 34px; padding: 0 11px; border: 1px solid rgba(128,157,199,.22); border-radius: 9px; color: #b8c8df; background: rgba(255,255,255,.045); cursor: pointer; font-size: 11px; font-weight: 650; }
 .editor-tool:hover:not(:disabled) { border-color: rgba(75,140,255,.55); color: white; }
 .editor-tool.active { border-color: rgba(91,157,255,.86); color: white; background: rgba(75,140,255,.28); box-shadow: 0 0 0 1px rgba(75,140,255,.16); }
@@ -101,6 +101,7 @@ h1 { margin: 12px 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: -1
 .annotation-layer.select-mode [data-annotation-id] { cursor: move; }
 .annotation-layer.select-mode [data-handle] { cursor: crosshair; }
 .annotation-layer.arrow-mode { cursor: crosshair; }
+.annotation-layer.rectangle-mode { cursor: crosshair; }
 .annotation-layer.text-mode { cursor: text; }
 .text-editor { position: absolute; z-index: 4; width: 210px; padding: 7px; border: 1px solid rgba(75,140,255,.72); border-radius: 9px; background: #111b2d; box-shadow: 0 10px 32px rgba(0,0,0,.45); }
 .text-editor[hidden] { display: none; }

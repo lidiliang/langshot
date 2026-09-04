@@ -17,6 +17,7 @@ public struct AnnotationPoint: Equatable, Sendable {
 
 public enum ImageAnnotation: Equatable, Sendable {
     case arrow(start: AnnotationPoint, end: AnnotationPoint, lineWidth: Double, color: String)
+    case rectangle(origin: AnnotationPoint, width: Double, height: Double, lineWidth: Double, color: String)
     case text(origin: AnnotationPoint, text: String, fontSize: Double, color: String)
 
     public init(json: JSONValue) throws {
@@ -29,6 +30,21 @@ public enum ImageAnnotation: Equatable, Sendable {
             let lineWidth = try value.number("lineWidth")
             guard (1...200).contains(lineWidth) else { throw AnnotationRendererError.invalidAnnotation }
             self = .arrow(start: start, end: end, lineWidth: lineWidth, color: value.string("color") ?? "#ff4d67")
+        case "rectangle":
+            let origin = try AnnotationPoint(x: value.number("x"), y: value.number("y"))
+            let width = try value.number("width")
+            let height = try value.number("height")
+            let lineWidth = try value.number("lineWidth")
+            guard (1...100_000).contains(width),
+                  (1...100_000).contains(height),
+                  (1...200).contains(lineWidth) else { throw AnnotationRendererError.invalidAnnotation }
+            self = .rectangle(
+                origin: origin,
+                width: width,
+                height: height,
+                lineWidth: lineWidth,
+                color: value.string("color") ?? "#ff4d67"
+            )
         case "text":
             let origin = try AnnotationPoint(x: value.number("x"), y: value.number("y"))
             guard case let .string(text)? = value["text"], !text.isEmpty, text.count <= 500 else {
@@ -127,12 +143,31 @@ public enum AnnotationRenderer {
             switch annotation {
             case let .arrow(start, end, lineWidth, color):
                 drawArrow(start: start, end: end, lineWidth: lineWidth, color: color, imageHeight: image.height, in: context)
+            case let .rectangle(origin, width, height, lineWidth, color):
+                drawRectangle(origin: origin, width: width, height: height, lineWidth: lineWidth, color: color, imageHeight: image.height, in: context)
             case let .text(origin, text, fontSize, color):
                 drawText(text, origin: origin, fontSize: fontSize, color: color, imageHeight: image.height, in: context)
             }
         }
         guard let result = context.makeImage() else { throw AnnotationRendererError.imageEncodingFailed }
         return result
+    }
+
+    private static func drawRectangle(origin: AnnotationPoint, width: Double, height: Double, lineWidth: Double, color: String, imageHeight: Int, in context: CGContext) {
+        let strokeWidth = CGFloat(lineWidth)
+        let rect = CGRect(
+            x: origin.x,
+            y: Double(imageHeight) - origin.y - height,
+            width: width,
+            height: height
+        ).insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2)
+        guard rect.width > 0, rect.height > 0 else { return }
+        let radius = min(max(strokeWidth * 1.5, 3), min(rect.width, rect.height) / 2)
+        context.setStrokeColor(cgColor(hex: color))
+        context.setLineWidth(strokeWidth)
+        context.setLineJoin(.round)
+        context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+        context.strokePath()
     }
 
     private static func drawArrow(start: AnnotationPoint, end: AnnotationPoint, lineWidth: Double, color: String, imageHeight: Int, in context: CGContext) {

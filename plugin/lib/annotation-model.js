@@ -19,6 +19,19 @@
     return Boolean(start && end && Math.hypot(end.x - start.x, end.y - start.y) >= minimumDistance)
   }
 
+  function rectangleFromPoints(start, end) {
+    return {
+      x: Math.min(start.x, end.x),
+      y: Math.min(start.y, end.y),
+      width: Math.abs(end.x - start.x),
+      height: Math.abs(end.y - start.y)
+    }
+  }
+
+  function rectangleIsVisible(rectangle, minimumSize = 4) {
+    return Boolean(rectangle && rectangle.width >= minimumSize && rectangle.height >= minimumSize)
+  }
+
   function arrowHeadPoints(start, end, lineWidth) {
     const angle = Math.atan2(end.y - start.y, end.x - start.x)
     const distance = Math.hypot(end.x - start.x, end.y - start.y)
@@ -49,10 +62,40 @@
         end: { x: annotation.end.x + safeDX, y: annotation.end.y + safeDY }
       }
     }
+    if (annotation.type === 'rectangle') {
+      return {
+        ...annotation,
+        x: clamp(annotation.x + dx, 0, Math.max(0, imageWidth - annotation.width)),
+        y: clamp(annotation.y + dy, 0, Math.max(0, imageHeight - annotation.height))
+      }
+    }
     return {
       ...annotation,
       x: clamp(annotation.x + dx, 0, imageWidth),
       y: clamp(annotation.y + dy, 0, imageHeight)
+    }
+  }
+
+  function resizeRectangle(annotation, handle, point, imageWidth, imageHeight, minimumSize = 4) {
+    if (annotation.type !== 'rectangle' || !['nw', 'ne', 'se', 'sw'].includes(handle)) {
+      throw new TypeError('A valid rectangle corner is required')
+    }
+    const left = annotation.x
+    const top = annotation.y
+    const right = annotation.x + annotation.width
+    const bottom = annotation.y + annotation.height
+    const safeX = clamp(point.x, 0, imageWidth)
+    const safeY = clamp(point.y, 0, imageHeight)
+    const nextLeft = handle.includes('w') ? Math.min(safeX, right - minimumSize) : left
+    const nextRight = handle.includes('e') ? Math.max(safeX, left + minimumSize) : right
+    const nextTop = handle.includes('n') ? Math.min(safeY, bottom - minimumSize) : top
+    const nextBottom = handle.includes('s') ? Math.max(safeY, top + minimumSize) : bottom
+    return {
+      ...annotation,
+      x: nextLeft,
+      y: nextTop,
+      width: nextRight - nextLeft,
+      height: nextBottom - nextTop
     }
   }
 
@@ -69,5 +112,15 @@
     }
   }
 
-  return { mapClientPoint, arrowIsVisible, arrowHeadPoints, clamp, translateAnnotation, moveArrowEndpoint }
+  return {
+    mapClientPoint,
+    arrowIsVisible,
+    arrowHeadPoints,
+    rectangleFromPoints,
+    rectangleIsVisible,
+    clamp,
+    translateAnnotation,
+    moveArrowEndpoint,
+    resizeRectangle
+  }
 })

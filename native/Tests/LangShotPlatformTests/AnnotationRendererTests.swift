@@ -6,7 +6,7 @@ import Testing
 import LangShotCore
 @testable import LangShotPlatform
 
-@Test func annotationPayloadParsesArrowAndTextOperations() throws {
+@Test func annotationPayloadParsesArrowRectangleAndTextOperations() throws {
     let annotations = try AnnotationRenderer.parse(.array([
         .object([
             "type": .string("arrow"),
@@ -15,11 +15,16 @@ import LangShotCore
             "lineWidth": .number(4), "color": .string("#ff4d67")
         ]),
         .object([
+            "type": .string("rectangle"), "x": .number(18), "y": .number(22),
+            "width": .number(70), "height": .number(40),
+            "lineWidth": .number(4), "color": .string("#ff4d67")
+        ]),
+        .object([
             "type": .string("text"), "x": .number(20), "y": .number(30),
             "text": .string("重点"), "fontSize": .number(18), "color": .string("#ff4d67")
         ])
     ]))
-    #expect(annotations.count == 2)
+    #expect(annotations.count == 3)
 }
 
 @Test func arrowAnnotationIsRenderedIntoTheOriginalPixels() throws {
@@ -37,6 +42,27 @@ import LangShotCore
     let linePixel = try #require(bitmap.colorAt(x: 45, y: 20))
     #expect(linePixel.redComponent > 0.8)
     #expect(linePixel.greenComponent < 0.3)
+}
+
+@Test func rectangleAnnotationIsRenderedIntoTheOriginalPixels() throws {
+    let source = try whiteImage(width: 120, height: 100)
+    let result = try AnnotationRenderer.render(
+        image: source,
+        annotations: [.rectangle(
+            origin: AnnotationPoint(x: 20, y: 15),
+            width: 75,
+            height: 55,
+            lineWidth: 5,
+            color: "#ff0000"
+        )]
+    )
+    let bitmap = NSBitmapImageRep(cgImage: result)
+    let borderPixel = try #require(bitmap.colorAt(x: 21, y: 40))
+    let interiorPixel = try #require(bitmap.colorAt(x: 50, y: 40))
+    #expect(borderPixel.redComponent > 0.8)
+    #expect(borderPixel.greenComponent < 0.3)
+    #expect(interiorPixel.redComponent > 0.9)
+    #expect(interiorPixel.greenComponent > 0.9)
 }
 
 @Test func textAnnotationIsRenderedNearItsTopLeftOrigin() throws {

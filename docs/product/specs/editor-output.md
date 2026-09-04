@@ -11,6 +11,16 @@
 - **WHEN** 用户添加标注后移动、修改或删除它
 - **THEN** 原始拼接块不被改写，预览和导出使用最新操作模型
 
+#### Scenario: User highlights content with a rectangle
+
+- **WHEN** 用户选择矩形工具并在预览图上拖拽出有效区域
+- **THEN** 系统创建醒目的空心圆角矩形并自动切回选择工具；用户可以拖动矩形整体位置或四角控制点调整尺寸，且标注始终限制在原图边界内
+
+#### Scenario: Rectangle is exported at a scaled preview
+
+- **WHEN** 用户在缩放预览中添加或调整矩形后复制图片或在访达中显示
+- **THEN** 原生导出器按照原始像素坐标绘制同色、同线宽的圆角矩形，矩形内部图像保持不变
+
 ### Requirement: Undo and redo
 
 编辑器 MUST 支持 `Cmd+Z` 撤销和 `Cmd+Shift+Z` 重做，并 SHALL 在产生新分支操作后清空不可达的重做分支。

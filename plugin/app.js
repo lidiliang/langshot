@@ -17,6 +17,7 @@ const copyButton = document.getElementById('copyButton')
 const revealButton = document.getElementById('revealButton')
 const selectToolButton = document.getElementById('selectToolButton')
 const arrowToolButton = document.getElementById('arrowToolButton')
+const rectangleToolButton = document.getElementById('rectangleToolButton')
 const textToolButton = document.getElementById('textToolButton')
 const undoEditButton = document.getElementById('undoEditButton')
 const actualPixelsButton = document.getElementById('actualPixelsButton')
@@ -34,6 +35,7 @@ let completedPath = null
 let editorTool = 'select'
 let annotations = []
 let draftArrow = null
+let draftRectangle = null
 let textOrigin = null
 let editingTextId = null
 let selectedAnnotationId = null
@@ -214,6 +216,7 @@ revealButton.addEventListener('click', async () => {
 
 selectToolButton.addEventListener('click', () => setEditorTool('select'))
 arrowToolButton.addEventListener('click', () => setEditorTool(editorTool === 'arrow' ? 'select' : 'arrow'))
+rectangleToolButton.addEventListener('click', () => setEditorTool(editorTool === 'rectangle' ? 'select' : 'rectangle'))
 textToolButton.addEventListener('click', () => setEditorTool(editorTool === 'text' ? 'select' : 'text'))
 undoEditButton.addEventListener('click', undoLastAnnotation)
 actualPixelsButton.addEventListener('click', () => setPreviewMode('actual'))
@@ -244,6 +247,18 @@ annotationLayer.addEventListener('pointerdown', event => {
     annotationLayer.setPointerCapture(event.pointerId)
     draftArrow = { id: nextAnnotationId(), type: 'arrow', start: point, end: point, lineWidth: editorLineWidth(), color: '#ff4d67' }
     renderAnnotations()
+  } else if (editorTool === 'rectangle') {
+    event.preventDefault()
+    annotationLayer.setPointerCapture(event.pointerId)
+    draftRectangle = {
+      id: nextAnnotationId(),
+      type: 'rectangle',
+      ...annotationModel.rectangleFromPoints(point, point),
+      lineWidth: editorLineWidth(),
+      color: '#ff4d67'
+    }
+    draftRectangle.origin = point
+    renderAnnotations()
   } else if (editorTool === 'text') {
     event.preventDefault()
     openTextEditor(point)
@@ -254,6 +269,10 @@ annotationLayer.addEventListener('pointermove', event => {
   if (!annotationLayer.hasPointerCapture(event.pointerId)) return
   if (draftArrow) {
     draftArrow.end = editorPoint(event)
+    renderAnnotations()
+  } else if (draftRectangle) {
+    const rectangle = annotationModel.rectangleFromPoints(draftRectangle.origin, editorPoint(event))
+    Object.assign(draftRectangle, rectangle)
     renderAnnotations()
   } else if (annotationDrag) {
     updateAnnotationDrag(editorPoint(event))
@@ -271,6 +290,18 @@ annotationLayer.addEventListener('pointerup', event => {
     }
     draftArrow = null
     renderAnnotations()
+  } else if (draftRectangle) {
+    const rectangle = annotationModel.rectangleFromPoints(draftRectangle.origin, editorPoint(event))
+    Object.assign(draftRectangle, rectangle)
+    delete draftRectangle.origin
+    if (annotationModel.rectangleIsVisible(draftRectangle, Math.max(3, draftRectangle.lineWidth))) {
+      recordAnnotationHistory()
+      annotations.push(draftRectangle)
+      selectedAnnotationId = draftRectangle.id
+      setEditorTool('select')
+    }
+    draftRectangle = null
+    renderAnnotations()
   } else if (annotationDrag) {
     finishAnnotationDrag()
   }
@@ -278,6 +309,7 @@ annotationLayer.addEventListener('pointerup', event => {
 
 annotationLayer.addEventListener('pointercancel', () => {
   draftArrow = null
+  draftRectangle = null
   cancelAnnotationDrag()
   renderAnnotations()
 })
@@ -309,19 +341,24 @@ function setEditorTool(tool) {
   if (tool !== 'text') closeTextEditor()
   selectToolButton.classList.toggle('active', editorTool === 'select')
   arrowToolButton.classList.toggle('active', editorTool === 'arrow')
+  rectangleToolButton.classList.toggle('active', editorTool === 'rectangle')
   textToolButton.classList.toggle('active', editorTool === 'text')
   selectToolButton.setAttribute('aria-pressed', String(editorTool === 'select'))
   arrowToolButton.setAttribute('aria-pressed', String(editorTool === 'arrow'))
+  rectangleToolButton.setAttribute('aria-pressed', String(editorTool === 'rectangle'))
   textToolButton.setAttribute('aria-pressed', String(editorTool === 'text'))
   annotationLayer.classList.add('editing')
   annotationLayer.classList.toggle('select-mode', editorTool === 'select')
   annotationLayer.classList.toggle('arrow-mode', editorTool === 'arrow')
+  annotationLayer.classList.toggle('rectangle-mode', editorTool === 'rectangle')
   annotationLayer.classList.toggle('text-mode', editorTool === 'text')
   editorHelp.textContent = editorTool === 'arrow'
     ? '在图片上拖拽以绘制箭头'
+    : editorTool === 'rectangle'
+      ? '在图片上拖拽以圈定重点区域'
     : editorTool === 'text'
       ? '点击图片位置，然后输入文字'
-      : '点击标注可选择并拖动，拖动箭头端点可调整，双击文字可重写'
+      : '点击标注可选择并拖动；箭头端点和矩形四角可调整，双击文字可重写'
 }
 
 function layoutEditorImage() {
@@ -369,7 +406,8 @@ function editorLineWidth() {
 }
 
 function renderAnnotations() {
-  const visible = draftArrow ? [...annotations, draftArrow] : annotations
+  const draft = draftArrow || draftRectangle
+  const visible = draft ? [...annotations, draft] : annotations
   annotationLayer.replaceChildren(...visible.map(createSvgAnnotation))
   undoEditButton.disabled = resultBusy || annotationHistory.length === 0
 }
@@ -402,6 +440,27 @@ function createSvgAnnotation(annotation) {
     head.setAttribute('pointer-events', 'none')
     group.append(hitLine, line, head)
     if (annotation.id === selectedAnnotationId) appendArrowSelection(group, annotation)
+    return group
+  }
+
+  if (annotation.type === 'rectangle') {
+    const hitBox = document.createElementNS(namespace, 'rect')
+    setRectangleGeometry(hitBox, annotation)
+    hitBox.setAttribute('fill', 'transparent')
+    hitBox.setAttribute('stroke', 'transparent')
+    hitBox.setAttribute('stroke-width', Math.max(annotation.lineWidth * 4, 12 / Math.max(0.01, editorScale())))
+    hitBox.setAttribute('pointer-events', 'all')
+    hitBox.dataset.annotationId = annotation.id
+    const rectangle = document.createElementNS(namespace, 'rect')
+    setRectangleGeometry(rectangle, annotation)
+    rectangle.setAttribute('fill', 'none')
+    rectangle.setAttribute('stroke', annotation.color)
+    rectangle.setAttribute('stroke-width', annotation.lineWidth)
+    rectangle.setAttribute('rx', Math.max(annotation.lineWidth * 1.5, 3))
+    rectangle.setAttribute('ry', Math.max(annotation.lineWidth * 1.5, 3))
+    rectangle.setAttribute('pointer-events', 'none')
+    group.append(hitBox, rectangle)
+    if (annotation.id === selectedAnnotationId) appendRectangleSelection(group, annotation)
     return group
   }
 
@@ -446,6 +505,13 @@ function setLineGeometry(line, annotation) {
   line.setAttribute('y2', annotation.end.y)
 }
 
+function setRectangleGeometry(rectangle, annotation) {
+  rectangle.setAttribute('x', annotation.x)
+  rectangle.setAttribute('y', annotation.y)
+  rectangle.setAttribute('width', annotation.width)
+  rectangle.setAttribute('height', annotation.height)
+}
+
 function appendArrowSelection(group, annotation) {
   const namespace = 'http://www.w3.org/2000/svg'
   const padding = Math.max(annotation.lineWidth * 2.5, 7 / Math.max(0.01, editorScale()))
@@ -460,6 +526,20 @@ function appendArrowSelection(group, annotation) {
   group.append(createArrowHandle(annotation, 'start'), createArrowHandle(annotation, 'end'))
 }
 
+function appendRectangleSelection(group, annotation) {
+  const namespace = 'http://www.w3.org/2000/svg'
+  const padding = Math.max(annotation.lineWidth * 2, 5 / Math.max(0.01, editorScale()))
+  const box = document.createElementNS(namespace, 'rect')
+  box.setAttribute('x', annotation.x - padding)
+  box.setAttribute('y', annotation.y - padding)
+  box.setAttribute('width', annotation.width + padding * 2)
+  box.setAttribute('height', annotation.height + padding * 2)
+  styleSelectionBox(box)
+  box.setAttribute('pointer-events', 'none')
+  group.append(box)
+  for (const handle of ['nw', 'ne', 'se', 'sw']) group.append(createRectangleHandle(annotation, handle))
+}
+
 function styleSelectionBox(box) {
   box.setAttribute('fill', 'none')
   box.setAttribute('stroke', '#78a9ff')
@@ -472,6 +552,21 @@ function createArrowHandle(annotation, handle) {
   const point = annotation[handle]
   circle.setAttribute('cx', point.x)
   circle.setAttribute('cy', point.y)
+  circle.setAttribute('r', Math.max(annotation.lineWidth * 1.8, 5 / Math.max(0.01, editorScale())))
+  circle.setAttribute('fill', '#ffffff')
+  circle.setAttribute('stroke', '#4b8cff')
+  circle.setAttribute('stroke-width', 2 / Math.max(0.01, editorScale()))
+  circle.dataset.annotationId = annotation.id
+  circle.dataset.handle = handle
+  return circle
+}
+
+function createRectangleHandle(annotation, handle) {
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+  const east = handle.includes('e')
+  const south = handle.includes('s')
+  circle.setAttribute('cx', east ? annotation.x + annotation.width : annotation.x)
+  circle.setAttribute('cy', south ? annotation.y + annotation.height : annotation.y)
   circle.setAttribute('r', Math.max(annotation.lineWidth * 1.8, 5 / Math.max(0.01, editorScale())))
   circle.setAttribute('fill', '#ffffff')
   circle.setAttribute('stroke', '#4b8cff')
@@ -573,13 +668,22 @@ function updateAnnotationDrag(point) {
   const dy = point.y - drag.start.y
   drag.changed = drag.changed || Math.hypot(dx, dy) >= 0.5
   const index = annotations.findIndex(candidate => candidate.id === drag.annotationId)
-  if (drag.kind === 'start' || drag.kind === 'end') {
+  if (drag.original.type === 'arrow' && (drag.kind === 'start' || drag.kind === 'end')) {
     annotations[index] = annotationModel.moveArrowEndpoint(
       drag.original,
       drag.kind,
       point,
       resultImage.naturalWidth,
       resultImage.naturalHeight
+    )
+  } else if (drag.original.type === 'rectangle' && ['nw', 'ne', 'se', 'sw'].includes(drag.kind)) {
+    annotations[index] = annotationModel.resizeRectangle(
+      drag.original,
+      drag.kind,
+      point,
+      resultImage.naturalWidth,
+      resultImage.naturalHeight,
+      Math.max(3, drag.original.lineWidth)
     )
   } else {
     annotations[index] = annotationModel.translateAnnotation(
@@ -639,6 +743,7 @@ function resetAnnotationEditor() {
   annotations = []
   annotationHistory = []
   draftArrow = null
+  draftRectangle = null
   annotationDrag = null
   selectedAnnotationId = null
   resultBusy = false
@@ -649,13 +754,14 @@ function resetAnnotationEditor() {
   editorStage.style.removeProperty('height')
   selectToolButton.disabled = false
   arrowToolButton.disabled = false
+  rectangleToolButton.disabled = false
   textToolButton.disabled = false
   undoEditButton.disabled = true
 }
 
 function serializedAnnotations() {
-  return annotations.map(annotation => annotation.type === 'arrow'
-    ? {
+  return annotations.map(annotation => {
+    if (annotation.type === 'arrow') return {
         type: 'arrow',
         startX: annotation.start.x,
         startY: annotation.start.y,
@@ -664,14 +770,24 @@ function serializedAnnotations() {
         lineWidth: annotation.lineWidth,
         color: annotation.color
       }
-    : {
+    if (annotation.type === 'rectangle') return {
+      type: 'rectangle',
+      x: annotation.x,
+      y: annotation.y,
+      width: annotation.width,
+      height: annotation.height,
+      lineWidth: annotation.lineWidth,
+      color: annotation.color
+    }
+    return {
         type: 'text',
         x: annotation.x,
         y: annotation.y,
         text: annotation.text,
         fontSize: annotation.fontSize,
         color: annotation.color
-      })
+      }
+  })
 }
 
 async function exportAnnotationsIfNeeded() {
@@ -686,6 +802,7 @@ async function exportAnnotationsIfNeeded() {
   annotations = []
   annotationHistory = []
   draftArrow = null
+  draftRectangle = null
   selectedAnnotationId = null
   closeTextEditor()
   setEditorTool('select')
@@ -700,6 +817,7 @@ function setResultBusy(value, label = '复制图片') {
   revealButton.disabled = value
   selectToolButton.disabled = value
   arrowToolButton.disabled = value
+  rectangleToolButton.disabled = value
   textToolButton.disabled = value
   copyButton.textContent = value ? label : '复制图片'
   renderAnnotations()

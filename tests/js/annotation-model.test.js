@@ -2,7 +2,16 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { mapClientPoint, arrowIsVisible, arrowHeadPoints, translateAnnotation, moveArrowEndpoint } = require('../../plugin/lib/annotation-model')
+const {
+  mapClientPoint,
+  arrowIsVisible,
+  arrowHeadPoints,
+  rectangleFromPoints,
+  rectangleIsVisible,
+  translateAnnotation,
+  moveArrowEndpoint,
+  resizeRectangle
+} = require('../../plugin/lib/annotation-model')
 
 test('preview pointer coordinates map to original image pixels', () => {
   const point = mapClientPoint(210, 120, { left: 10, top: 20, width: 400, height: 200 }, 1600, 800)
@@ -40,4 +49,36 @@ test('either arrow endpoint can be adjusted independently', () => {
 test('text objects can be repositioned inside the image', () => {
   const annotation = { id: 't', type: 'text', x: 20, y: 30, text: '重点' }
   assert.deepEqual(translateAnnotation(annotation, -40, 90, 100, 100), { ...annotation, x: 0, y: 100 })
+})
+
+test('rectangle gestures normalize any drag direction and ignore tiny boxes', () => {
+  const rectangle = rectangleFromPoints({ x: 80, y: 70 }, { x: 20, y: 10 })
+  assert.deepEqual(rectangle, { x: 20, y: 10, width: 60, height: 60 })
+  assert.equal(rectangleIsVisible(rectangle, 4), true)
+  assert.equal(rectangleIsVisible({ x: 1, y: 1, width: 3, height: 20 }, 4), false)
+})
+
+test('rectangle objects move as one object and stay inside the image', () => {
+  const rectangle = { id: 'r', type: 'rectangle', x: 20, y: 30, width: 50, height: 40 }
+  assert.deepEqual(translateAnnotation(rectangle, 50, 50, 100, 100), {
+    ...rectangle,
+    x: 50,
+    y: 60
+  })
+})
+
+test('rectangle corners resize independently with a minimum size', () => {
+  const rectangle = { id: 'r', type: 'rectangle', x: 20, y: 30, width: 50, height: 40 }
+  assert.deepEqual(resizeRectangle(rectangle, 'se', { x: 90, y: 95 }, 100, 100), {
+    ...rectangle,
+    width: 70,
+    height: 65
+  })
+  assert.deepEqual(resizeRectangle(rectangle, 'nw', { x: 100, y: 100 }, 100, 100), {
+    ...rectangle,
+    x: 66,
+    y: 66,
+    width: 4,
+    height: 4
+  })
 })
