@@ -55,7 +55,7 @@ test('plugin entry hides the homepage before checking permissions', () => {
   const projectRoot = path.resolve(__dirname, '../..')
   const app = fs.readFileSync(path.join(projectRoot, 'plugin', 'app.js'), 'utf8')
 
-  assert.match(app, /async function startCaptureFlow\(\) \{[\s\S]*window\.langShot\.hideMainWindow\(\)[\s\S]*request\('permissions\.get'\)/)
+  assert.match(app, /async function startCaptureFlow\(\) \{[\s\S]*window\.langShot\.hideMainWindow\(\)[\s\S]*request\('session\.prepare'/)
   assert.match(app, /function showPermissionDialog\(missing\) \{[\s\S]*window\.langShot\.showMainWindow\(\)/)
   assert.match(app, /event\.type === 'session\.completed' \|\| event\.type === 'session\.cancelled' \|\| event\.type === 'error'/)
 })
@@ -67,6 +67,7 @@ test('capture opens directly in simple screenshot mode', () => {
   const html = fs.readFileSync(path.join(projectRoot, 'plugin', 'index.html'), 'utf8')
 
   assert.equal(manifest.features[0].explain, '开始截图')
+  assert.equal(manifest.features[0].mainHide, true)
   assert.match(app, /const state = \{ mode: 'simple'/)
   assert.match(app, /function resetForNewEntry\(\)[\s\S]*void startCaptureFlow\(\)/)
   assert.match(html, /class="mode-card selected" data-mode="simple"/)

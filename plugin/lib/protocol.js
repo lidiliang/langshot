@@ -7,6 +7,7 @@ const REQUEST_TYPES = new Set([
   'permissions.get',
   'permissions.request',
   'permissions.openSettings',
+  'session.prepare',
   'session.begin',
   'selection.confirm',
   'selection.reset',
@@ -48,4 +49,3 @@ function parseMessage(line) {
 }
 
 module.exports = { PROTOCOL_VERSION, REQUEST_TYPES, createRequest, parseMessage }
-

@@ -14,6 +14,11 @@ final class ProtocolWriter: @unchecked Sendable {
 }
 
 final class HelperRuntime {
+    private struct PreparedDisplay {
+        let id: UInt32
+        let image: CGImage
+    }
+
     private let writer: ProtocolWriter
     private let permissionService = PermissionService()
     private var overlay: SelectionOverlayController?
@@ -24,6 +29,7 @@ final class HelperRuntime {
     private var globalKeyMonitor: Any?
     private var capturePaused = false
     private var captureRecoveryExhausted = false
+    private var preparedDisplay: PreparedDisplay?
 
     init(writer: ProtocolWriter) {
         self.writer = writer
@@ -40,6 +46,8 @@ final class HelperRuntime {
             case "permissions.get":
                 let snapshot = permissionService.snapshot()
                 respond(request, ["screenRecording": .bool(snapshot.screenRecording), "accessibility": .bool(snapshot.accessibility)])
+            case "session.prepare":
+                prepareSession(request)
             case "permissions.request":
                 let kind = request.payload["kind"] == .string("accessibility") ? PermissionKind.accessibility : .screenRecording
                 respond(request, ["granted": .bool(permissionService.request(kind))])
@@ -92,6 +100,21 @@ final class HelperRuntime {
     }
 
     @MainActor
+    private func prepareSession(_ request: RequestEnvelope) {
+        preparedDisplay = nil
+        let permissions = permissionService.snapshot()
+        if permissions.screenRecording,
+           let display = DisplayService().display(containing: NSEvent.mouseLocation),
+           let image = try? ScreenCaptureService().captureDisplay(display.geometry) {
+            preparedDisplay = PreparedDisplay(id: display.geometry.id, image: image)
+        }
+        respond(request, [
+            "screenRecording": .bool(permissions.screenRecording),
+            "accessibility": .bool(permissions.accessibility)
+        ])
+    }
+
+    @MainActor
     private func beginSession(_ request: RequestEnvelope) {
         guard overlay == nil else {
             writer.write(ResponseEnvelope(requestId: request.requestId, error: ProtocolFailure(code: "SESSION_ACTIVE", message: "A capture session is already active")))
@@ -113,9 +136,17 @@ final class HelperRuntime {
         default: preferredMode = .simple
         }
         let requestedDirection: ScrollDirection = request.payload["direction"] == .string("up") ? .up : .down
+        let frozenDisplayImage: CGImage?
+        if preparedDisplay?.id == display.geometry.id {
+            frozenDisplayImage = preparedDisplay?.image
+        } else {
+            frozenDisplayImage = try? ScreenCaptureService().captureDisplay(display.geometry)
+        }
+        preparedDisplay = nil
         activeSessionId = sessionId
         overlay = SelectionOverlayController(
             display: display,
+            frozenDisplayImage: frozenDisplayImage,
             preferredMode: preferredMode,
             preferredDirection: requestedDirection,
             onConfirm: { [weak self] display, selection, windowID, mode, direction in
@@ -144,7 +175,10 @@ final class HelperRuntime {
                     self?.startEngine(sessionId: sessionId, mode: mode, direction: direction, selection: selection, windowID: windowID, anchor: anchor)
                 }
             } else {
-                self.startEngine(sessionId: sessionId, mode: mode, direction: direction, selection: selection, windowID: windowID, anchor: nil)
+                let initialImage = frozenDisplayImage.flatMap {
+                    try? ScreenCaptureService().cropDisplayImage($0, display: display.geometry, selection: selection)
+                }
+                self.startEngine(sessionId: sessionId, mode: mode, direction: direction, selection: selection, windowID: windowID, anchor: nil, initialImage: initialImage)
             }
         },
             onCancel: { [weak self] in self?.discardSession(sessionId: sessionId) }
@@ -154,7 +188,7 @@ final class HelperRuntime {
     }
 
     @MainActor
-    private func startEngine(sessionId: String, mode: CaptureMode, direction: ScrollDirection, selection: RectValue, windowID: CGWindowID, anchor: PointValue?) {
+    private func startEngine(sessionId: String, mode: CaptureMode, direction: ScrollDirection, selection: RectValue, windowID: CGWindowID, anchor: PointValue?, initialImage: CGImage? = nil) {
         installKeyMonitor(sessionId: sessionId)
         captureRecoveryExhausted = false
         let targetPoint = anchor ?? PointValue(
@@ -170,6 +204,7 @@ final class HelperRuntime {
             overlayWindowId: windowID,
             anchor: anchor,
             targetProcessIdentifier: targetPID,
+            initialImage: mode == .simple ? initialImage : nil,
             progress: { [weak self] progress in
                 guard let self else { return }
                 let label = mode == .simple ? "正在截图…" : "长截图中… \(progress.height)px · \(progress.frames) 帧"

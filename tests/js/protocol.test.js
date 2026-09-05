@@ -14,6 +14,12 @@ test('createRequest emits a versioned request with caller payload', () => {
   })
 })
 
+test('capture preparation is part of the protocol surface', () => {
+  const request = createRequest('session.prepare', { mode: 'simple' }, 'prepare-1')
+  assert.equal(request.type, 'session.prepare')
+  assert.equal(request.payload.mode, 'simple')
+})
+
 test('createRequest rejects commands outside the protocol surface', () => {
   assert.throws(() => createRequest('shell.exec', {}), /Unsupported request type/)
 })
@@ -25,4 +31,3 @@ test('parseMessage rejects malformed and incompatible helper output', () => {
     /Incompatible protocol version/
   )
 })
-

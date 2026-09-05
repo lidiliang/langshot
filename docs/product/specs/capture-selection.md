@@ -4,12 +4,12 @@
 
 ### Requirement: Capture-first plugin entry
 
-系统 MUST 将原生鼠标框选作为搜索结果与快捷键打开插件后的第一交互界面，并 SHALL 在任何异步权限检查前同步隐藏 uTools 插件主窗口，避免首页在框选前出现或闪烁。
+系统 MUST 将原生鼠标框选作为搜索结果与快捷键打开插件后的第一交互界面，截图 feature MUST 启用 `mainHide` 以阻止 uTools 主窗口在插件进入前激活，并 SHALL 在任何异步权限检查前再次同步隐藏主窗口，避免首页在框选前出现、闪烁或关闭目标应用的临时界面。
 
 #### Scenario: User opens langShot from uTools
 
 - **WHEN** 用户通过搜索结果或快捷键进入 langShot，且屏幕录制权限可用
-- **THEN** 系统直接显示鼠标框选覆盖层，默认使用简单截图，不经过可见的插件首页
+- **THEN** uTools 主窗口保持隐藏且不取得焦点，系统直接显示鼠标框选覆盖层，默认使用简单截图，不经过可见的插件首页
 
 #### Scenario: User cancels region selection
 
@@ -43,6 +43,11 @@
 ### Requirement: Single-display region selection
 
 系统 SHALL 允许用户在任意单块显示器内拖拽选区，通过四边、四角和键盘进行像素级调整，并 MUST 阻止选区跨越显示器边界。
+
+#### Scenario: Transient target UI is visible when capture starts
+
+- **WHEN** 用户在目标应用中展开菜单、弹出框或下拉列表后通过快捷键启动 langShot
+- **THEN** 系统在框选覆盖层出现前冻结当前显示器画面，并以该冻结画面完成框选和简单截图，使临时界面即使随后因系统焦点规则关闭也仍在选区与结果中可见
 
 #### Scenario: Pointer recommends an accessible element
 

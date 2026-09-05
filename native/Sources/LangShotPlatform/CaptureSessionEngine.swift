@@ -55,6 +55,7 @@ public final class CaptureSessionEngine {
     private let overlayWindowId: CGWindowID
     private let anchor: PointValue?
     private let targetProcessIdentifier: pid_t?
+    private var initialImage: CGImage?
     private let capture = ScreenCaptureService()
     private let automaticMatcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 24, minimumOverlapFraction: 0.35, confidenceThreshold: 0.68)
     private let manualMatcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 12, minimumOverlapFraction: 0.12, confidenceThreshold: 0.72)
@@ -87,9 +88,10 @@ public final class CaptureSessionEngine {
     private var consecutiveMatchFailures = 0
     private var qualityWarnings: Set<CaptureQualityWarning> = []
 
-    public init(sessionId: String, mode: CaptureMode, requestedDirection: ScrollDirection, selection: RectValue, overlayWindowId: CGWindowID, anchor: PointValue?, targetProcessIdentifier: pid_t?, progress: @escaping ProgressHandler, status: @escaping StatusHandler, completion: @escaping CompletionHandler) {
+    public init(sessionId: String, mode: CaptureMode, requestedDirection: ScrollDirection, selection: RectValue, overlayWindowId: CGWindowID, anchor: PointValue?, targetProcessIdentifier: pid_t?, initialImage: CGImage? = nil, progress: @escaping ProgressHandler, status: @escaping StatusHandler, completion: @escaping CompletionHandler) {
         self.sessionId = sessionId; self.mode = mode; self.requestedDirection = requestedDirection
         self.selection = selection; self.overlayWindowId = overlayWindowId; self.anchor = anchor; self.targetProcessIdentifier = targetProcessIdentifier
+        self.initialImage = initialImage
         self.progress = progress; self.status = status; self.completion = completion
     }
 
@@ -161,10 +163,12 @@ public final class CaptureSessionEngine {
         guard !captureInFlight, !isCancelled, !isFinishing else { return }
         captureInFlight = true
         let selection = self.selection, windowID = overlayWindowId
+        let initialImage = mode == .simple ? self.initialImage : nil
+        self.initialImage = nil
         worker.async { [weak self] in
             guard let self else { return }
             do {
-                let image = try self.capture.capture(selection: selection, belowWindow: windowID)
+                let image = try initialImage ?? self.capture.capture(selection: selection, belowWindow: windowID)
                 let probe = try Self.makeProbe(image)
                 DispatchQueue.main.async { self.accept(image: image, probe: probe) }
             } catch {

@@ -23,19 +23,23 @@ public final class SelectionOverlayController: NSObject {
     private var isActive = false
     private var selectionFrameOnScreen: NSRect?
 
-    public init(display: NativeDisplay, preferredMode: CaptureMode = .simple, preferredDirection: ScrollDirection = .down, onConfirm: @escaping Confirmation, onCancel: @escaping () -> Void) {
+    public init(display: NativeDisplay, frozenDisplayImage: CGImage? = nil, preferredMode: CaptureMode = .simple, preferredDirection: ScrollDirection = .down, onConfirm: @escaping Confirmation, onCancel: @escaping () -> Void) {
         self.display = display
         self.onConfirm = onConfirm
         self.onCancel = onCancel
         window = NSPanel(
             contentRect: NSRect(origin: .zero, size: display.screen.frame.size),
-            styleMask: [.borderless],
+            // Keep the target application active while the selection UI is
+            // visible. Activating the helper dismisses transient UI such as
+            // menus, popovers, and drop-down lists before it can be captured.
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false,
             screen: display.screen
         )
         overlayView = SelectionOverlayView(
             frame: NSRect(origin: .zero, size: display.screen.frame.size),
+            frozenDisplayImage: frozenDisplayImage,
             preferredMode: preferredMode,
             preferredDirection: preferredDirection
         )
@@ -46,7 +50,8 @@ public final class SelectionOverlayController: NSObject {
     public func show() {
         isActive = true
         installSelectionKeyMonitors()
-        NSApp.activate(ignoringOtherApps: true)
+        // A nonactivating panel can receive selection input without moving
+        // application focus away from the content being captured.
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(overlayView)
     }
@@ -141,8 +146,8 @@ public final class SelectionOverlayController: NSObject {
 
     public func beginCapturing(mode: CaptureMode, status: String, onTogglePause: @escaping () -> Void, onFinish: @escaping () -> Void, onCancel: @escaping () -> Void) {
         removeSelectionKeyMonitors()
-        window.styleMask = [.borderless, .nonactivatingPanel]
         window.resignKey()
+        overlayView.releaseFrozenDisplayImage()
         overlayView.phase = .capturing
         overlayView.hideSelectionToolbar()
         overlayView.status = status
@@ -232,6 +237,7 @@ private final class SelectionOverlayView: NSView {
     private var clickCandidate: NSRect?
     private var selectedMode: CaptureMode
     private var selectedDirection: ScrollDirection
+    private var frozenDisplayImage: NSImage?
     private let minimumSize: CGFloat = 24
     private let toolbar = NSStackView()
     private let simpleModeButton = NSButton(title: "立即截图", target: nil, action: nil)
@@ -242,9 +248,10 @@ private final class SelectionOverlayView: NSView {
     private let resetButton = NSButton(title: "重新框选", target: nil, action: nil)
     private let cancelButton = NSButton(title: "取消", target: nil, action: nil)
 
-    init(frame frameRect: NSRect, preferredMode: CaptureMode, preferredDirection: ScrollDirection) {
+    init(frame frameRect: NSRect, frozenDisplayImage: CGImage?, preferredMode: CaptureMode, preferredDirection: ScrollDirection) {
         selectedMode = preferredMode
         selectedDirection = preferredDirection
+        self.frozenDisplayImage = frozenDisplayImage.map { NSImage(cgImage: $0, size: frameRect.size) }
         super.init(frame: frameRect)
         toolbar.orientation = .horizontal
         toolbar.alignment = .centerY
@@ -374,6 +381,7 @@ private final class SelectionOverlayView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        drawFrozenDisplayImage()
         NSColor(calibratedWhite: 0.02, alpha: 0.58).setFill()
         bounds.fill()
         guard let visibleRect = selection ?? hoverCandidate else {
@@ -381,10 +389,17 @@ private final class SelectionOverlayView: NSView {
             drawHint("移动鼠标智能选择 · 拖拽自由框选 · Esc 取消")
             return
         }
-        NSGraphicsContext.saveGraphicsState()
-        NSColor.clear.setFill()
-        visibleRect.fill(using: .copy)
-        NSGraphicsContext.restoreGraphicsState()
+        if frozenDisplayImage != nil {
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: visibleRect).addClip()
+            drawFrozenDisplayImage()
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            NSGraphicsContext.saveGraphicsState()
+            NSColor.clear.setFill()
+            visibleRect.fill(using: .copy)
+            NSGraphicsContext.restoreGraphicsState()
+        }
         let border = NSBezierPath(roundedRect: visibleRect, xRadius: 2, yRadius: 2)
         border.lineWidth = 2
         NSColor(calibratedRed: 0.24, green: 0.55, blue: 1, alpha: 1).setStroke()
@@ -534,6 +549,22 @@ private final class SelectionOverlayView: NSView {
     }
 
     func hideSelectionToolbar() { toolbar.isHidden = true }
+
+    func releaseFrozenDisplayImage() {
+        frozenDisplayImage = nil
+        needsDisplay = true
+    }
+
+    private func drawFrozenDisplayImage() {
+        frozenDisplayImage?.draw(
+            in: bounds,
+            from: .zero,
+            operation: .copy,
+            fraction: 1,
+            respectFlipped: true,
+            hints: [.interpolation: NSImageInterpolation.none]
+        )
+    }
 
     @objc private func resetSelection() {
         selection = nil

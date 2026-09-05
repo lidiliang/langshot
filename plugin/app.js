@@ -84,7 +84,7 @@ async function startCaptureFlow() {
   window.langShot.hideMainWindow()
   setBusy(true)
   try {
-    const permissions = await window.langShot.request('permissions.get')
+    const permissions = await window.langShot.request('session.prepare', { mode: state.mode, direction: state.direction })
     const missing = missingPermissions(permissions)
     if (missing.length) {
       showPermissionDialog(missing)
@@ -869,6 +869,13 @@ async function resumeAfterPermission() {
   closePermissionDialog()
   setBusy(true)
   try {
+    window.langShot.hideMainWindow()
+    const permissions = await window.langShot.request('session.prepare', { mode: state.mode, direction: state.direction })
+    const missing = missingPermissions(permissions)
+    if (missing.length) {
+      showPermissionDialog(missing)
+      return
+    }
     await beginCapture()
   } catch (error) {
     showToast(error.message || '无法启动截图')

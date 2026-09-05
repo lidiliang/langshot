@@ -71,7 +71,7 @@ AppKit 能稳定覆盖其他应用、处理多显示器坐标，并把权限、�
 
 **Choice**
 
-最低系统路径使用 `CGWindowListCreateImage` 的 `.optionOnScreenBelowWindow`，以覆盖层窗口为层级边界捕获其下方内容，并请求 `.bestResolution`。所有 point 坐标先绑定 `NSScreen`，再通过显示器 scale 与实际 `CGImage` 尺寸校验为物理像素矩形。macOS 12.3+ 可在验证一致后增加 ScreenCaptureKit 优化，但不改变协议。
+最低系统路径使用 CoreGraphics。进入框选前先以 `CGDisplayCreateImage` 冻结鼠标所在显示器的原始物理像素；框选层显示冻结画面，简单截图按最终选区从同一帧裁剪，以保留菜单、弹出框和下拉列表等易失界面。滚动截图仍以 `CGWindowListCreateImage` 的 `.optionOnScreenBelowWindow` 和覆盖层窗口作为层级边界，捕获其下方的实时内容。所有 point 坐标先绑定 `NSScreen`，再通过显示器 scale 与实际 `CGImage` 尺寸校验为物理像素矩形。macOS 12.3+ 可在验证一致后增加 ScreenCaptureKit 优化，但不改变协议。
 
 **Rationale**
 

@@ -12,6 +12,7 @@
     {
       "code": "langshot.capture",
       "explain": "开始截图",
+      "mainHide": true,
       "cmds": ["截图", "长截图", "长截屏", "滚动截图", "langShot"]
     }
   ]
