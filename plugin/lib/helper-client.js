@@ -132,7 +132,10 @@ function resolveHelperPath(options = {}) {
   const bundledApp = options.bundledApp || path.join(__dirname, '..', 'native', 'langshot-helper.app')
   const bundledBinary = path.join(bundledApp, helperBinaryRelativePath)
   const development = options.development || path.resolve(__dirname, '..', '..', 'native', '.build', 'debug', 'langshot-helper')
-  if (!fs.existsSync(bundledBinary)) return development
+  if (!fs.existsSync(bundledBinary)) {
+    if (fs.existsSync(development)) return development
+    throw new Error('离线包缺少 langShot Helper。请执行 npm run package:dev，并在 uTools 开发者工具中重新导入 dist/langshot/plugin.json 后再打包。')
+  }
   return materializeBundledHelper(bundledApp, options.installRoot || resolveHelperInstallRoot())
 }
 

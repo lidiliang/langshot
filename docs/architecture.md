@@ -218,7 +218,7 @@ Web 与 Swift 必须共享编辑文档 schema 和黄金图测试；helper 只接
 
 **Choice**
 
-`scripts/build-native.sh` 分别构建 arm64/x86_64 并 `lipo`，包装 helper app；`scripts/package-plugin.sh` 生成开发包并检查大小；`scripts/sign-and-notarize.sh` 只有检测到显式凭据时才签名、公证和 staple。CI/本地验证使用 `lipo -info`、`otool` 和 `codesign --verify`。
+`scripts/build-native.sh` 分别构建 arm64/x86_64 并 `lipo`，包装 helper app；`npm run package:dev` 强制先构建 Helper，再由 `scripts/package-plugin.sh` 生成开发包。`scripts/verify-bundle.sh` 校验 manifest、Helper 文件、可执行权限、Universal 双架构和 20MB 包体上限，uTools 开发者工具只能从通过校验的 `dist/langshot/plugin.json` 生成 UPXS。`scripts/sign-and-notarize.sh` 只有检测到显式凭据时才签名、公证和 staple。CI/本地验证使用 `lipo -info`、`otool` 和 `codesign --verify`。
 
 **Rationale**
 

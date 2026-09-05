@@ -7,7 +7,7 @@ langShot 是一个面向 macOS 的 uTools 截图插件，同时支持普通选�
 - 打开插件后直接进入智能框选，框选完成后再选择截图模式
 - 简单截图（默认）、手动滚动、自动滚动三种模式
 - 单显示器选区与 Retina 原始像素捕获
-- 手动滚动、自动滚动锚点、向上/向下模式
+- 手动滚动、自动滚动锚点、向上/向下模式及顶部/底部自动完成
 - 滚动进度与操作面板紧贴选区，并自动避让屏幕边缘
 - 自动重叠检测、固定顶/底区域抑制
 - 60,000px 高度与 10 分钟保护
@@ -34,11 +34,10 @@ langShot 是一个面向 macOS 的 uTools 截图插件，同时支持普通选�
 
 ```bash
 npm run check
-npm run build:native
 npm run package:dev
 ```
 
-构建会生成 `dist/langshot`，其中包含插件页面和 arm64/x86_64 Universal 原生 Helper。在 uTools 开发者工具中选择 `dist/langshot/plugin.json` 即可加载开发版本。
+`package:dev` 会先构建 arm64/x86_64 Universal Helper，再生成并校验 `dist/langshot`。在 uTools 开发者工具中必须选择 `dist/langshot/plugin.json`；源码目录的 `plugin/plugin.json` 只用于配合 `.build/debug` 调试，不能直接用来生成离线安装包，否则 `.upxs` 会遗漏原生 Helper。
 
 ## 使用与快捷键
 
@@ -64,10 +63,10 @@ npm run package:dev
 
 不需要把插件提交到 uTools 应用市场，也可以通过 `.upxs` 离线安装包安装为本地正式插件。安装后的插件由 uTools 管理，重启 uTools 后仍然保留。
 
-1. 按照上面的命令完成构建，确认已生成 `dist/langshot/plugin.json`。
+1. 执行 `npm run package:dev`，确认输出包含 `Verified plugin bundle with Universal helper`。
 2. 在 uTools 中搜索并打开“uTools 开发者工具”。
-3. 导入现有项目，选择 `dist/langshot/plugin.json`，先在开发模式中完成一次截图验证。
-4. 在开发者工具中点击“打包”，填写版本信息并选择保存位置，生成 `.upxs` 安装包。
+3. 删除或停止指向源码目录 `plugin/plugin.json` 的旧开发项目，重新导入 `dist/langshot/plugin.json`，先在开发模式中完成一次截图验证。
+4. 在这个重新导入的 `dist/langshot/plugin.json` 项目中点击“打包”，填写版本信息并选择保存位置，生成 `.upxs` 安装包。若安装包体积只有几十 KB，说明 Helper 未被打入，不能发布；当前 Universal 包通常应为数百 KB。生成后执行 `npm run verify:upxs -- deploy/langShot-x.y.z.upxs`，通过体积门禁后再安装和提交。
 5. 推荐通过 uTools 搜索框安装 `.upxs`：
    - 在访达中选中并复制 `.upxs` 文件。
    - 使用自己的快捷键呼出 uTools 搜索框，按 `Cmd+V` 把文件粘贴进去。

@@ -103,8 +103,13 @@
 
 #### Scenario: No effective movement remains
 
-- **WHEN** 连续规定数量的帧均没有通过有效位移阈值
-- **THEN** 系统继续保持采集控制可用但不追加重复画面，不自动完成、不跳转结果页，也不插入“疑似到底”或“点击继续”的暂停；等待用户点击“完成”或按 `Enter`
+- **WHEN** 已检测到至少一次真实位移，且滚动区域在目标方向已到边界并且下一次滚动不再产生可靠位移
+- **THEN** 自动模式不追加重复画面并自动完成；向下滚动识别底部，向上滚动识别顶部。应用未暴露辅助功能滚动条位置时，系统在连续四次无位移后使用视觉检测兜底完成
+
+#### Scenario: A stationary frame is not at the scroll boundary
+
+- **WHEN** 辅助功能滚动条表明目标方向仍可继续滚动，但当前帧暂时没有产生可见位移
+- **THEN** 系统不得完成或进入匹配失败重试，应继续发送下一次小步滚动，以穿过空白区域或恢复短暂未响应的滚动
 
 #### Scenario: Automatic scrolling has not produced its first movement
 

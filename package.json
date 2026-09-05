@@ -8,7 +8,10 @@
     "test:native": "swift test --package-path native",
     "check": "npm test && npm run test:native",
     "build:native": "bash scripts/build-native.sh",
-    "package:dev": "bash scripts/package-plugin.sh"
+    "package:files": "bash scripts/package-plugin.sh",
+    "package:dev": "npm run build:native && npm run package:files",
+    "verify:bundle": "bash scripts/verify-bundle.sh dist/langshot",
+    "verify:upxs": "bash scripts/verify-upxs.sh"
   },
   "engines": {
     "node": ">=18"

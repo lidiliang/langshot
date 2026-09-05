@@ -219,11 +219,75 @@ import LangShotCore
     ) == .sample)
 }
 
-@Test func stationaryEndDetectionNeverFinishesWithoutUserConfirmation() {
+@Test func automaticEndDetectionFinishesAtAConfirmedStationaryBoundary() {
     #expect(!CaptureSessionEngine.shouldFinishAutomatically(at: .none))
-    #expect(!CaptureSessionEngine.shouldFinishAutomatically(at: .suspectedEnd))
+    #expect(CaptureSessionEngine.shouldFinishAutomatically(at: .suspectedEnd))
     #expect(CaptureSessionEngine.shouldFinishAutomatically(at: .heightLimit))
     #expect(CaptureSessionEngine.shouldFinishAutomatically(at: .durationLimit))
+}
+
+@Test func accessibilityScrollGeometryRecognizesBothEnds() {
+    #expect(ScrollBoundaryDetector.isAtBoundary(
+        value: 1,
+        minimum: 0,
+        maximum: 1,
+        direction: .down
+    ))
+    #expect(ScrollBoundaryDetector.isAtBoundary(
+        value: 0.001,
+        minimum: 0,
+        maximum: 1,
+        direction: .up
+    ))
+    #expect(!ScrollBoundaryDetector.isAtBoundary(
+        value: 0.5,
+        minimum: 0,
+        maximum: 1,
+        direction: .down
+    ))
+    #expect(!ScrollBoundaryDetector.isAtBoundary(
+        value: 0,
+        minimum: 0,
+        maximum: 0,
+        direction: .up
+    ))
+}
+
+@Test func aRejectedFrameOnlyConfirmsTheEndAfterRealMovement() {
+    #expect(CaptureSessionEngine.rejectedAutomaticFrameConfirmsBoundary(
+        hasObservedMovement: true,
+        boundaryBeforeScroll: true
+    ))
+    #expect(!CaptureSessionEngine.rejectedAutomaticFrameConfirmsBoundary(
+        hasObservedMovement: false,
+        boundaryBeforeScroll: true
+    ))
+    #expect(!CaptureSessionEngine.rejectedAutomaticFrameConfirmsBoundary(
+        hasObservedMovement: true,
+        boundaryBeforeScroll: false
+    ))
+    #expect(!CaptureSessionEngine.rejectedAutomaticFrameConfirmsBoundary(
+        hasObservedMovement: true,
+        boundaryBeforeScroll: nil
+    ))
+}
+
+@Test func localizedAnimationAtTheScrollBoundaryIsTreatedAsNoMovement() {
+    #expect(CaptureSessionEngine.automaticFrameAppearsStationary(
+        unchangedDifference: 9,
+        unchangedPixelFraction: 0.96,
+        bestDisplacedDifference: 10,
+    ))
+    #expect(!CaptureSessionEngine.automaticFrameAppearsStationary(
+        unchangedDifference: 9,
+        unchangedPixelFraction: 0.80,
+        bestDisplacedDifference: 10,
+    ))
+    #expect(!CaptureSessionEngine.automaticFrameAppearsStationary(
+        unchangedDifference: 15,
+        unchangedPixelFraction: 0.97,
+        bestDisplacedDifference: 4,
+    ))
 }
 
 @Test func completedImagesUseTheUserManagedLangshotsDirectory() {

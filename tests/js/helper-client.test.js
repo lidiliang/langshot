@@ -7,7 +7,7 @@ const { PassThrough } = require('node:stream')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { HelperClient, materializeBundledHelper } = require('../../plugin/lib/helper-client')
+const { HelperClient, materializeBundledHelper, resolveHelperPath } = require('../../plugin/lib/helper-client')
 
 test('HelperClient correlates a split-line response with its request', async () => {
   const child = fakeChild()
@@ -117,6 +117,16 @@ test('changed helper bundle metadata creates a new materialized version', t => {
 
   assert.notEqual(nextBinary, firstBinary)
   assert.equal(fs.readFileSync(path.join(nextBinary, '..', '..', 'Info.plist'), 'utf8'), '<plist>1.0.1</plist>')
+})
+
+test('an installed package without its bundled helper reports the release packaging fix', t => {
+  const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'langshot-missing-helper-test-'))
+  t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }))
+
+  assert.throws(() => resolveHelperPath({
+    bundledApp: path.join(fixtureRoot, 'missing.app'),
+    development: path.join(fixtureRoot, 'native', '.build', 'debug', 'langshot-helper')
+  }), /npm run package:dev[\s\S]*dist\/langshot\/plugin\.json/)
 })
 
 function fakeChild({ exitOnKill = true } = {}) {

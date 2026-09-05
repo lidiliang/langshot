@@ -104,6 +104,15 @@ import Testing
     #expect(try matcher.differenceWithoutMovement(previous: first, current: changed) == 30)
 }
 
+@Test func unchangedPixelFractionIgnoresALocalizedDynamicRegion() throws {
+    let previous = try GrayFrame(width: 10, height: 10, pixels: [UInt8](repeating: 80, count: 100))
+    var currentPixels = previous.pixels
+    for index in 0..<5 { currentPixels[index] = 220 }
+    let current = try GrayFrame(width: 10, height: 10, pixels: currentPixels)
+
+    #expect(try OverlapMatcher().unchangedPixelFraction(previous: previous, current: current) == 0.95)
+}
+
 @Test func compactScreenFixedControlIsDetectedInsideMovingContent() throws {
     let width = 24, height = 24
     let frames = try (0..<5).map { shift -> GrayFrame in

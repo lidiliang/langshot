@@ -106,6 +106,27 @@ public struct OverlapMatcher: Sendable {
         return meanAbsoluteDifference(previous: previous, current: current, displacement: 0, direction: .down)
     }
 
+    public func unchangedPixelFraction(
+        previous: GrayFrame,
+        current: GrayFrame,
+        tolerance: UInt8 = 8
+    ) throws -> Double {
+        guard previous.width == current.width, previous.height == current.height else { throw MatchError.incompatibleFrames }
+        let stride = max(1, previous.width / 160)
+        var unchanged = 0
+        var count = 0
+        for row in 0..<previous.height {
+            for column in Swift.stride(from: 0, to: previous.width, by: stride) {
+                let index = row * previous.width + column
+                if abs(Int(previous.pixels[index]) - Int(current.pixels[index])) <= Int(tolerance) {
+                    unchanged += 1
+                }
+                count += 1
+            }
+        }
+        return count == 0 ? 0 : Double(unchanged) / Double(count)
+    }
+
     private func meanAbsoluteDifference(previous: GrayFrame, current: GrayFrame, displacement: Int, direction: ScrollDirection) -> Double {
         let overlap = previous.height - displacement
         let stride = max(1, previous.width / 160)

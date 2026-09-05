@@ -61,6 +61,7 @@ public final class CaptureSessionEngine {
     private let manualMatcher = OverlapMatcher(minimumDisplacement: 2, minimumOverlap: 12, minimumOverlapFraction: 0.12, confidenceThreshold: 0.72)
     private let staticDetector = StaticBandDetector()
     private let scrollInputBlocker = ScrollInputBlocker()
+    private let scrollBoundaryDetector = ScrollBoundaryDetector()
     private let policy = SessionPolicy()
     private let worker = DispatchQueue(label: "app.langshot.capture", qos: .userInitiated)
     private let progress: ProgressHandler
@@ -86,6 +87,7 @@ public final class CaptureSessionEngine {
     private var hasObservedMovement = false
     private var resampleBeforeNextScroll = false
     private var consecutiveMatchFailures = 0
+    private var boundaryBeforeAutomaticScroll: Bool?
     private var qualityWarnings: Set<CaptureQualityWarning> = []
 
     public init(sessionId: String, mode: CaptureMode, requestedDirection: ScrollDirection, selection: RectValue, overlayWindowId: CGWindowID, anchor: PointValue?, targetProcessIdentifier: pid_t?, initialImage: CGImage? = nil, progress: @escaping ProgressHandler, status: @escaping StatusHandler, completion: @escaping CompletionHandler) {
@@ -149,6 +151,7 @@ public final class CaptureSessionEngine {
                 sample()
                 return
             case .scroll:
+                boundaryBeforeAutomaticScroll = automaticScrollIsAtBoundary(at: anchor)
                 postScroll(at: anchor, direction: requestedDirection, lines: automaticStepLines)
                 awaitingAutomaticSample = true
                 automaticSampleNotBefore = Date().addingTimeInterval(automaticStepLines == 1 ? 0.18 : 0.22)
@@ -213,6 +216,12 @@ public final class CaptureSessionEngine {
             }
             guard let best = candidates.max(by: { $0.1.confidence < $1.1.confidence }) else { throw MatchError.invalidFrame }
             let unchangedDifference = try matcher.differenceWithoutMovement(previous: matchingPrevious, current: matchingCurrent)
+            let unchangedPixelFraction = try matcher.unchangedPixelFraction(previous: previousProbe, current: probe)
+            let automaticFrameAppearsStationary = mode == .automatic && Self.automaticFrameAppearsStationary(
+                unchangedDifference: unchangedDifference,
+                unchangedPixelFraction: unchangedPixelFraction,
+                bestDisplacedDifference: best.1.alignmentDifference
+            )
             let acceptedByPrediction = Self.predictedMatchIsAcceptable(
                 result: best.1,
                 recentDisplacements: acceptedProbeDisplacements,
@@ -220,17 +229,33 @@ public final class CaptureSessionEngine {
                 probeHeight: matchingPrevious.height
             )
             guard best.1.accepted || acceptedByPrediction else {
-                if unchangedDifference > 6 {
+                if mode == .automatic,
+                   Self.rejectedAutomaticFrameConfirmsBoundary(
+                       hasObservedMovement: hasObservedMovement,
+                       boundaryBeforeScroll: boundaryBeforeAutomaticScroll
+                   ) {
+                    finish()
+                    return
+                }
+                if unchangedDifference > 6 && !automaticFrameAppearsStationary {
                     handleUncertainMatch(byResynchronizingTo: probe)
                     return
                 }
-                stationaryProbes += 1
                 if mode == .automatic {
+                    let recoveredFromUncertainMatch = consecutiveMatchFailures > 0
+                    consecutiveMatchFailures = 0
                     awaitingAutomaticSample = false
                     resampleBeforeNextScroll = false
+                    if recoveredFromUncertainMatch { status(.running) }
                     if !hasObservedMovement {
                         return
                     }
+                    if boundaryBeforeAutomaticScroll == false {
+                        stationaryProbes = 0
+                        boundaryBeforeAutomaticScroll = nil
+                        return
+                    }
+                    stationaryProbes += 1
                     let boundary = policy.boundary(
                         mode: mode,
                         elapsed: Date().timeIntervalSince(startedAt),
@@ -250,6 +275,7 @@ public final class CaptureSessionEngine {
             consecutiveMatchFailures = 0
             resampleBeforeNextScroll = false
             awaitingAutomaticSample = false
+            boundaryBeforeAutomaticScroll = nil
             acceptedProbeDisplacements.append(best.1.displacement)
             if acceptedProbeDisplacements.count > 6 { acceptedProbeDisplacements.removeFirst() }
             if mode == .automatic {
@@ -368,6 +394,24 @@ public final class CaptureSessionEngine {
         consecutiveFailures >= automaticRecoveryAttemptLimit
     }
 
+    nonisolated static func rejectedAutomaticFrameConfirmsBoundary(
+        hasObservedMovement: Bool,
+        boundaryBeforeScroll: Bool?
+    ) -> Bool {
+        hasObservedMovement && boundaryBeforeScroll == true
+    }
+
+    nonisolated static func automaticFrameAppearsStationary(
+        unchangedDifference: Double,
+        unchangedPixelFraction: Double,
+        bestDisplacedDifference: Double
+    ) -> Bool {
+        if unchangedDifference <= 6 { return true }
+        guard unchangedDifference <= 24, unchangedPixelFraction >= 0.94 else { return false }
+        let comparisonTolerance = max(1.5, unchangedDifference * 0.12)
+        return unchangedDifference <= bestDisplacedDifference + comparisonTolerance
+    }
+
     nonisolated static func predictedMatchIsAcceptable(
         result: OverlapResult,
         recentDisplacements: [Int],
@@ -392,7 +436,7 @@ public final class CaptureSessionEngine {
     }
 
     nonisolated static func shouldFinishAutomatically(at boundary: SessionBoundary) -> Bool {
-        boundary == .heightLimit || boundary == .durationLimit
+        boundary == .suspectedEnd || boundary == .heightLimit || boundary == .durationLimit
     }
 
     nonisolated static func shouldFinishAfterFirstFrame(mode: CaptureMode) -> Bool {
@@ -401,6 +445,15 @@ public final class CaptureSessionEngine {
 
     private func invalidateTimers() {
         timer?.invalidate(); timer = nil
+    }
+
+    private func automaticScrollIsAtBoundary(at point: PointValue) -> Bool? {
+        guard mode == .automatic, let targetProcessIdentifier else { return nil }
+        return scrollBoundaryDetector.isAtBoundary(
+            at: CGPoint(x: point.x, y: point.y),
+            processIdentifier: targetProcessIdentifier,
+            direction: requestedDirection
+        )
     }
 
     private func persist(image: CGImage, index: Int) throws -> URL {
